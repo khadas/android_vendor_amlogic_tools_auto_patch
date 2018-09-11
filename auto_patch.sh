@@ -16,7 +16,7 @@
 function auto_patch()
 {
     local patch_dir=$1
-    echo -e "patch_dir $patch_dir\n"
+    echo "###patch_dir $patch_dir###      "
 
     for file in $patch_dir/*
     do
@@ -32,14 +32,14 @@ function auto_patch()
             then
                 cd $dir; git log | grep $change_id 1>/dev/null 2>&1;
                 if [ $? -ne 0 ]; then
-                    echo -e "patch $file\n"
+                    echo "###patch $file###      "
                     cd $dir; git am $file;
                     if [ $? != 0 ]
                     then
                         return 1
                     fi
                 else
-                    echo $file" has patched"
+                    echo "###$file has patched###      "
                 fi
             fi
         fi
@@ -53,6 +53,23 @@ function traverse_patch_dir()
     echo $local_dir
     for file in `ls $local_dir`
     do
+        if [[ "$file" =~ ".md" || "$file" =~ ".sh" ]]
+        then
+            continue
+        fi
+        # ATV don't apply AOSP patch
+        if [[ "$is_android_tv" == "true" && "$file" =~ "aosp" ]]
+        then
+            echo "###ATV version, don't need this patch:$file###      "
+            continue
+        fi
+        # if no LiveTv, don't apply tv patch
+        if [[ "$need_tv_feature" != "true" && "$file" =~ "tv" ]]
+        then
+            echo "###no need tv featrue, don't need this patch:$file###      "
+            continue
+        fi
+
         if [ -d $local_dir$file ]
         then
             local dest_dir=$local_dir$file
@@ -61,6 +78,12 @@ function traverse_patch_dir()
     done
     cd $T
 }
+
+
+need_tv_feature=$1
+is_android_tv=$2
+
+echo -e "###need_tv_feature=$need_tv_feature, is_android_tv=$is_android_tv###      "
 
 traverse_patch_dir
 
