@@ -16,7 +16,7 @@
 function auto_patch()
 {
     local patch_dir=$1
-    echo "###patch_dir $patch_dir###      "
+    echo "###patch_dir ${patch_dir##*/}###      "
 
     for file in $patch_dir/*
     do
@@ -32,14 +32,14 @@ function auto_patch()
             then
                 cd $dir; git log | grep $change_id 1>/dev/null 2>&1;
                 if [ $? -ne 0 ]; then
-                    echo "###patch $file###      "
+                    echo "###patch ${file##*/}###      "
                     cd $dir; git am $file;
                     if [ $? != 0 ]
                     then
                         return 1
                     fi
                 else
-                    echo "###$file has patched###      "
+                    echo "###${file##*/} has patched###      "
                 fi
             fi
         fi
@@ -48,9 +48,7 @@ function auto_patch()
 
 function traverse_patch_dir()
 {
-    T=$(pwd)
-    local local_dir=$T/vendor/amlogic/tools/auto_patch/
-    echo $local_dir
+    local local_dir=$1
     for file in `ls $local_dir`
     do
         if [[ "$file" =~ ".md" || "$file" =~ ".sh" ]]
@@ -79,13 +77,22 @@ function traverse_patch_dir()
     cd $T
 }
 
+T=$(pwd)
+LOCAL_PATH=$T/vendor/amlogic/tools/auto_patch/
+if [ -f "$LOCAL_PATH.patched" ]
+then
+    echo "auto patch already applied!"
+    exit 0
+else
+    touch $LOCAL_PATH.patched
+fi
 
 need_tv_feature=$1
 is_android_tv=$2
 
 echo -e "###need_tv_feature=$need_tv_feature, is_android_tv=$is_android_tv###      "
 
-traverse_patch_dir
+traverse_patch_dir $LOCAL_PATH
 
 if [ $? != 0 ]
 then
