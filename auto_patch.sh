@@ -78,7 +78,8 @@ function traverse_patch_dir()
 }
 
 T=$(pwd)
-LOCAL_PATH=$T/vendor/amlogic/tools/auto_patch/
+LOCAL_PATH=$T/$(dirname $0)/
+
 if [ -f "$LOCAL_PATH.patched" ]
 then
     echo "auto patch already applied!"
