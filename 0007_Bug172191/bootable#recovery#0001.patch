@@ -1,0 +1,268 @@
+From e855915f4f88bbff9fe2d1f857d8be3a5f88fb97 Mon Sep 17 00:00:00 2001
+From: Zhigang <zhigang.yu@amlogic.com>
+Date: Tue, 18 Sep 2018 14:00:41 +0800
+Subject: [PATCH] recovery: add upgrade function amlogic support[1/1]
+
+PD# 172191
+
+1.add update from Udisk.
+2.add Udisk auto mount.
+3.add update and factorytest once.
+4.add read recovery params from factory_update_param.aml.
+5.add ui display when run recovery with no params.
+
+Change-Id: Ib445d5e462b57cdb4f1def0eacbf328fbdc051b0
+---
+ device.cpp    |  5 ++--
+ device.h      |  2 +-
+ recovery.cpp  | 93 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ roots.cpp     |  8 +++++
+ screen_ui.cpp | 12 ++++----
+ 5 files changed, 110 insertions(+), 10 deletions(-)
+
+diff --git a/device.cpp b/device.cpp
+index 192d47c..061f8ac 100644
+--- a/device.cpp
++++ b/device.cpp
+@@ -20,7 +20,7 @@ static const char* MENU_ITEMS[] = {
+   "Reboot system now",
+   "Reboot to bootloader",
+   "Apply update from ADB",
+-  "Apply update from SD card",
++  "Apply update from EXT",
+   "Wipe data/factory reset",
+ #ifndef AB_OTA_UPDATER
+   "Wipe cache partition",
+@@ -37,7 +37,7 @@ static const Device::BuiltinAction MENU_ACTIONS[] = {
+   Device::REBOOT,
+   Device::REBOOT_BOOTLOADER,
+   Device::APPLY_ADB_SIDELOAD,
+-  Device::APPLY_SDCARD,
++  Device::APPLY_EXT,
+   Device::WIPE_DATA,
+ #ifndef AB_OTA_UPDATER
+   Device::WIPE_CACHE,
+@@ -78,6 +78,7 @@ int Device::HandleMenuKey(int key, bool visible) {
+ 
+     case KEY_ENTER:
+     case KEY_POWER:
++    case BTN_LEFT:
+     case KEY_SOURCE:
+       return kInvokeItem;
+ 
+diff --git a/device.h b/device.h
+index 2f2e0a9..8a928b5 100644
+--- a/device.h
++++ b/device.h
+@@ -58,7 +58,7 @@ class Device {
+   enum BuiltinAction {
+     NO_ACTION = 0,
+     REBOOT = 1,
+-    APPLY_SDCARD = 2,
++    APPLY_EXT = 2,
+     // APPLY_CACHE was 3.
+     APPLY_ADB_SIDELOAD = 4,
+     WIPE_DATA = 5,
+diff --git a/recovery.cpp b/recovery.cpp
+index 07ec5cf..c661de6 100644
+--- a/recovery.cpp
++++ b/recovery.cpp
+@@ -110,6 +110,7 @@ static const char *CACHE_ROOT = "/cache";
+ static const char *DATA_ROOT = "/data";
+ static const char* METADATA_ROOT = "/metadata";
+ static const char *SDCARD_ROOT = "/sdcard";
++static const char *UDISK_ROOT = "/udisk";
+ static const char *TEMPORARY_LOG_FILE = "/tmp/recovery.log";
+ static const char *TEMPORARY_INSTALL_FILE = "/tmp/last_install";
+ static const char *LAST_KMSG_FILE = "/cache/recovery/last_kmsg";
+@@ -139,6 +140,8 @@ std::string stage;
+ const char* reason = nullptr;
+ struct selabel_handle* sehandle;
+ 
++extern void amlogic_get_args(std::vector<std::string>& args);
++
+ /*
+  * The recovery tool communicates with the main system through /cache files.
+  *   /cache/recovery/command - INPUT - command line for tool, one arg per line
+@@ -369,6 +372,9 @@ static std::vector<std::string> get_args(const int argc, char** const argv) {
+     }
+   }
+ 
++  //add get args from factory_update_param.aml
++  amlogic_get_args(args);
++
+   // Write the arguments (excluding the filename in args[0]) back into the
+   // bootloader control block. So the device will always boot into recovery to
+   // finish the pending work, until finish_recovery() is called.
+@@ -991,6 +997,84 @@ static void choose_recovery_file(Device* device) {
+   }
+ }
+ 
++static int ext_update(Device* device, bool wipe_cache) {
++    int status = 0;
++    int found_upgrade = 0;
++    std::string  update_package;
++    /*const char** title_headers = NULL;
++    const char* headers[] = { "Confirm update?",
++                    "  THIS CAN NOT BE UNDONE.",
++                    "",
++                    NULL };*/
++    const char* items[] = { " ../",
++                    " Update from sdcard",
++                    " Update from udisk",
++                    NULL };
++
++    int chosen_item = get_menu_selection(nullptr, items, 1, 0, device);
++        if (chosen_item != 1 && chosen_item != 2) {
++        return 1;
++    }
++
++    switch (chosen_item) {
++        case 1:
++            // Some packages expect /cache to be mounted (eg,
++            // standard incremental packages expect to use /cache
++            // as scratch space).
++            ensure_path_mounted(CACHE_ROOT);
++            ensure_path_unmounted(SDCARD_ROOT); // umount, if pull card and then insert card
++            ensure_path_mounted(SDCARD_ROOT);
++            update_package = browse_directory(SDCARD_ROOT, device);
++            if (update_package.empty()) {
++                ui->Print("\n-- No package file selected.\n");
++                break;
++            }
++            found_upgrade = 1;
++            break;
++
++        case 2:
++            ensure_path_mounted(CACHE_ROOT);
++            ensure_path_unmounted(UDISK_ROOT);
++            ensure_path_mounted(UDISK_ROOT);
++            update_package = browse_directory(UDISK_ROOT, device);
++            if (update_package.empty()) {
++                ui->Print("\n-- No package file selected.\n");
++                break;
++            }
++            found_upgrade = 2;
++            break;
++    }
++
++    if (!found_upgrade) return 1;
++
++    ui->Print("\n-- Install %s ...\n", update_package.c_str());
++    set_sdcard_update_bootloader_message();
++    status = install_package(update_package.c_str(), &wipe_cache, TEMPORARY_INSTALL_FILE, true, 0);
++
++    if (status == INSTALL_SUCCESS && wipe_cache) {
++        ui->Print("\n-- Wiping cache (at package request)...\n");
++        if (erase_volume("/cache")) {
++            ui->Print("Cache wipe failed.\n");
++        } else {
++            ui->Print("Cache wipe complete.\n");
++        }
++    }
++
++    if (status >= 0) {
++        if (status != INSTALL_SUCCESS) {
++            ui->SetBackground(RecoveryUI::ERROR);
++            ui->Print("Installation aborted.\n");
++        } else if (!ui->IsTextVisible()) {
++            return 0;   // reboot if logs aren't visible
++        } else {
++            ui->Print("\nInstall from %s complete.\n",
++                (found_upgrade == 1) ? "sdcard" : "udisk");
++        }
++    }
++
++    return 1;
++}
++
+ static void run_graphics_test() {
+   // Switch to graphics screen.
+   ui->ShowText(false);
+@@ -1164,8 +1248,11 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
+         if (!ui->IsTextVisible()) return Device::NO_ACTION;
+         break;
+ 
++      case Device::APPLY_EXT:
++        ext_update(device, should_wipe_cache);
++        break;
++
+       case Device::APPLY_ADB_SIDELOAD:
+-      case Device::APPLY_SDCARD:
+         {
+           bool adb = (chosen_action == Device::APPLY_ADB_SIDELOAD);
+           if (adb) {
+@@ -1618,7 +1705,9 @@ int main(int argc, char **argv) {
+         }
+       }
+     }
+-  } else if (should_wipe_data) {
++  }
++
++  if (should_wipe_data) {
+     if (!wipe_data(device)) {
+       status = INSTALL_ERROR;
+     }
+diff --git a/roots.cpp b/roots.cpp
+index 184e799..a3dad59 100644
+--- a/roots.cpp
++++ b/roots.cpp
+@@ -45,6 +45,8 @@ static struct fstab* fstab = nullptr;
+ 
+ extern struct selabel_handle* sehandle;
+ 
++extern int ensure_path_mounted_extra(Volume *v);
++
+ void load_volume_table() {
+   fstab = fs_mgr_read_fstab_default();
+   if (!fstab) {
+@@ -125,6 +127,12 @@ int ensure_path_mounted_at(const char* path, const char* mount_point) {
+ 
+   mkdir(mount_point, 0755);  // in case it doesn't already exist
+ 
++  //add usb device(/dev/sd##) mount
++  int ret = ensure_path_mounted_extra(v);
++  if (ret != 2) {
++      return ret;
++  }
++
+   if (strcmp(v->fs_type, "ext4") == 0 || strcmp(v->fs_type, "squashfs") == 0 ||
+       strcmp(v->fs_type, "vfat") == 0) {
+     int result = mount(v->blk_device, mount_point, v->fs_type, v->flags, v->fs_options);
+diff --git a/screen_ui.cpp b/screen_ui.cpp
+index 04071bb..eaddbed 100644
+--- a/screen_ui.cpp
++++ b/screen_ui.cpp
+@@ -416,14 +416,16 @@ static const char* LONG_PRESS_HELP[] = {
+ // Redraws everything on the screen. Does not flip pages. Should only be called with updateMutex
+ // locked.
+ void ScreenRecoveryUI::draw_screen_locked() {
++
++  draw_background_locked();
++  draw_foreground_locked();
++
+   if (!show_text) {
+-    draw_background_locked();
+-    draw_foreground_locked();
+     return;
+   }
+ 
+-  gr_color(0, 0, 0, 255);
+-  gr_clear();
++  //gr_color(0, 0, 0, 255);
++  //gr_clear();
+ 
+   int y = kMarginHeight;
+   if (show_menu) {
+@@ -509,7 +511,7 @@ void ScreenRecoveryUI::ProgressThreadLoop() {
+ 
+     // update the installation animation, if active
+     // skip this if we have a text overlay (too expensive to update)
+-    if ((currentIcon == INSTALLING_UPDATE || currentIcon == ERASING) && !show_text) {
++    if ((currentIcon == INSTALLING_UPDATE || currentIcon == ERASING) /*&& !show_text*/) {
+       if (!intro_done) {
+         if (current_frame == intro_frames - 1) {
+           intro_done = true;
+-- 
+1.9.1
+
