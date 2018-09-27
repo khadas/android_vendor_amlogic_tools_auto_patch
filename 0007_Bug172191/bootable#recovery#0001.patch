@@ -1,7 +1,7 @@
-From e855915f4f88bbff9fe2d1f857d8be3a5f88fb97 Mon Sep 17 00:00:00 2001
+From 3abcaef4156f20d09919881cfd0c09db31397e8f Mon Sep 17 00:00:00 2001
 From: Zhigang <zhigang.yu@amlogic.com>
-Date: Tue, 18 Sep 2018 14:00:41 +0800
-Subject: [PATCH] recovery: add upgrade function amlogic support[1/1]
+Date: Thu, 16 Aug 2018 15:52:03 +0800
+Subject: [PATCH] add upgrade function amlogic support [1/1]
 
 PD# 172191
 
@@ -11,7 +11,7 @@ PD# 172191
 4.add read recovery params from factory_update_param.aml.
 5.add ui display when run recovery with no params.
 
-Change-Id: Ib445d5e462b57cdb4f1def0eacbf328fbdc051b0
+Change-Id: I84da705eefe9cb3ac9e573769992d0862e9e6a15
 ---
  device.cpp    |  5 ++--
  device.h      |  2 +-
@@ -21,7 +21,7 @@ Change-Id: Ib445d5e462b57cdb4f1def0eacbf328fbdc051b0
  5 files changed, 110 insertions(+), 10 deletions(-)
 
 diff --git a/device.cpp b/device.cpp
-index 192d47c..061f8ac 100644
+index f881daf..1a0750f 100644
 --- a/device.cpp
 +++ b/device.cpp
 @@ -20,7 +20,7 @@ static const char* MENU_ITEMS[] = {
@@ -43,18 +43,18 @@ index 192d47c..061f8ac 100644
  #ifndef AB_OTA_UPDATER
    Device::WIPE_CACHE,
 @@ -78,6 +78,7 @@ int Device::HandleMenuKey(int key, bool visible) {
- 
+
      case KEY_ENTER:
      case KEY_POWER:
 +    case BTN_LEFT:
-     case KEY_SOURCE:
        return kInvokeItem;
- 
+
+     default:
 diff --git a/device.h b/device.h
-index 2f2e0a9..8a928b5 100644
+index 74745b3..39f5d2b 100644
 --- a/device.h
 +++ b/device.h
-@@ -58,7 +58,7 @@ class Device {
+@@ -56,7 +56,7 @@ class Device {
    enum BuiltinAction {
      NO_ACTION = 0,
      REBOOT = 1,
@@ -78,7 +78,7 @@ index 07ec5cf..c661de6 100644
 @@ -139,6 +140,8 @@ std::string stage;
  const char* reason = nullptr;
  struct selabel_handle* sehandle;
- 
+
 +extern void amlogic_get_args(std::vector<std::string>& args);
 +
  /*
@@ -87,7 +87,7 @@ index 07ec5cf..c661de6 100644
 @@ -369,6 +372,9 @@ static std::vector<std::string> get_args(const int argc, char** const argv) {
      }
    }
- 
+
 +  //add get args from factory_update_param.aml
 +  amlogic_get_args(args);
 +
@@ -97,7 +97,7 @@ index 07ec5cf..c661de6 100644
 @@ -991,6 +997,84 @@ static void choose_recovery_file(Device* device) {
    }
  }
- 
+
 +static int ext_update(Device* device, bool wipe_cache) {
 +    int status = 0;
 +    int found_upgrade = 0;
@@ -182,7 +182,7 @@ index 07ec5cf..c661de6 100644
 @@ -1164,8 +1248,11 @@ static Device::BuiltinAction prompt_and_wait(Device* device, int status) {
          if (!ui->IsTextVisible()) return Device::NO_ACTION;
          break;
- 
+
 +      case Device::APPLY_EXT:
 +        ext_update(device, should_wipe_cache);
 +        break;
@@ -204,36 +204,36 @@ index 07ec5cf..c661de6 100644
        status = INSTALL_ERROR;
      }
 diff --git a/roots.cpp b/roots.cpp
-index 184e799..a3dad59 100644
+index 184e799..ef32418 100644
 --- a/roots.cpp
 +++ b/roots.cpp
 @@ -45,6 +45,8 @@ static struct fstab* fstab = nullptr;
- 
+
  extern struct selabel_handle* sehandle;
- 
+
 +extern int ensure_path_mounted_extra(Volume *v);
 +
  void load_volume_table() {
    fstab = fs_mgr_read_fstab_default();
    if (!fstab) {
 @@ -125,6 +127,12 @@ int ensure_path_mounted_at(const char* path, const char* mount_point) {
- 
+
    mkdir(mount_point, 0755);  // in case it doesn't already exist
- 
-+  //add usb device(/dev/sd##) mount
-+  int ret = ensure_path_mounted_extra(v);
-+  if (ret != 2) {
-+      return ret;
-+  }
+
++    //add usb device(/dev/sd##) mount
++    int ret = ensure_path_mounted_extra(v);
++    if (ret != 2) {
++        return ret;
++    }
 +
    if (strcmp(v->fs_type, "ext4") == 0 || strcmp(v->fs_type, "squashfs") == 0 ||
        strcmp(v->fs_type, "vfat") == 0) {
      int result = mount(v->blk_device, mount_point, v->fs_type, v->flags, v->fs_options);
 diff --git a/screen_ui.cpp b/screen_ui.cpp
-index 04071bb..eaddbed 100644
+index c8fb5aa..997cfb3 100644
 --- a/screen_ui.cpp
 +++ b/screen_ui.cpp
-@@ -416,14 +416,16 @@ static const char* LONG_PRESS_HELP[] = {
+@@ -419,14 +419,16 @@ static const char* LONG_PRESS_HELP[] = {
  // Redraws everything on the screen. Does not flip pages. Should only be called with updateMutex
  // locked.
  void ScreenRecoveryUI::draw_screen_locked() {
@@ -246,16 +246,16 @@ index 04071bb..eaddbed 100644
 -    draw_foreground_locked();
      return;
    }
- 
+
 -  gr_color(0, 0, 0, 255);
 -  gr_clear();
 +  //gr_color(0, 0, 0, 255);
 +  //gr_clear();
- 
+
    int y = kMarginHeight;
    if (show_menu) {
-@@ -509,7 +511,7 @@ void ScreenRecoveryUI::ProgressThreadLoop() {
- 
+@@ -512,7 +514,7 @@ void ScreenRecoveryUI::ProgressThreadLoop() {
+
      // update the installation animation, if active
      // skip this if we have a text overlay (too expensive to update)
 -    if ((currentIcon == INSTALLING_UPDATE || currentIcon == ERASING) && !show_text) {
@@ -263,6 +263,6 @@ index 04071bb..eaddbed 100644
        if (!intro_done) {
          if (current_frame == intro_frames - 1) {
            intro_done = true;
--- 
+--
 1.9.1
 

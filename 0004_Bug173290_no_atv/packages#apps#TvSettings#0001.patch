@@ -1,6 +1,6 @@
-From a0ef4ca9d0ae5ad770e50141ae1d748f8fe936e9 Mon Sep 17 00:00:00 2001
+From ffcdaf7f2a2ef712931e90e2f4dd27a7417ece59 Mon Sep 17 00:00:00 2001
 From: Lei Qian <lei.qian@amlogic.com>
-Date: Tue, 11 Sep 2018 19:42:16 +0800
+Date: Thu, 27 Sep 2018 12:38:53 +0800
 Subject: [PATCH] FallbackHome: set tv_user_setup_complete to 1 when firstboot
  [1/1]
 
@@ -9,36 +9,28 @@ PD#173290
     only set it in AOSP version, because we have not user setup APK
 in AOSP version
 
-Change-Id: I119328e5bba4fed00219567ae15e1ec462ce80d6
+Change-Id: I009fe829bb0affab63f6833832dd60b55ad3fe79
 Signed-off-by: Lei Qian <lei.qian@amlogic.com>
 ---
- Settings/src/com/android/tv/settings/system/FallbackHome.java | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Settings/src/com/android/tv/settings/system/FallbackHome.java | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/Settings/src/com/android/tv/settings/system/FallbackHome.java b/Settings/src/com/android/tv/settings/system/FallbackHome.java
-index 1cff8ef..571e203 100644
+index 0924606..c45a88f 100644
 --- a/Settings/src/com/android/tv/settings/system/FallbackHome.java
 +++ b/Settings/src/com/android/tv/settings/system/FallbackHome.java
-@@ -19,6 +19,7 @@ package com.android.tv.settings.system;
- import android.app.Activity;
- import android.content.BroadcastReceiver;
- import android.content.Context;
-+import android.content.ContentResolver;
- import android.content.Intent;
- import android.content.IntentFilter;
- import android.content.pm.ResolveInfo;
-@@ -26,8 +27,10 @@ import android.os.Bundle;
- import android.os.Handler;
- import android.os.Message;
- import android.os.RemoteException;
-+import android.os.SystemProperties;
- import android.os.UserHandle;
- import android.os.UserManager;
-+import android.provider.Settings;
- import android.util.Log;
+@@ -30,6 +30,10 @@ import android.util.Log;
  
- import com.android.internal.widget.LockPatternUtils;
-@@ -61,6 +64,11 @@ public class FallbackHome extends Activity implements RestrictedProfilePinDialog
+ import java.util.Objects;
+ 
++import android.content.ContentResolver;
++import android.provider.Settings;
++import android.os.SystemProperties;
++
+ public class FallbackHome extends Activity {
+     private static final String TAG = "FallbackHome";
+ 
+@@ -49,6 +53,11 @@ public class FallbackHome extends Activity {
      private BroadcastReceiver mReceiver = new BroadcastReceiver() {
          @Override
          public void onReceive(Context context, Intent intent) {
