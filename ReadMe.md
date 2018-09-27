@@ -38,5 +38,6 @@ modify patch name, like this, include path and sequence
        in the directory `vendor/amlogic/tools/auto_patch/`, create dir like this
    xxxx_Bugyyyy, **xxxx** is number ID like 0001/0002 etc. **yyyy** is Bug ID.
    like 0001_Bug170298, and copy second step patches to this directory.
-       if you wish your patch not applied on ATV version, you can named the directory to "xxxx_Bugyyyy_no_atv"; 
-       if you wish your patch only applied on TV platform, you can named the directory to "xxxx_Bugyyyy_tv"; 
+       if you wish your patch not applied on ATV version, you can named the directory to "xxxx_Bugyyyy_aosp_ui"; 
+       if you wish your patch not applied on GTVS version, you can named the directory to "xxxx_Bugyyyy_gtvs_ui"; 
+       if you wish your patch only applied on TV platform, you can named the directory to "xxxx_Bugyyyy_tv_platform"; 
