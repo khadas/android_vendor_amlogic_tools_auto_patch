@@ -32,14 +32,14 @@ function auto_patch()
             then
                 cd $dir; git log | grep $change_id 1>/dev/null 2>&1;
                 if [ $? -ne 0 ]; then
-                    echo "###patch ${file##*/}###      "
+                    #echo "###patch ${file##*/}###      "
                     cd $dir; git am $file;
                     if [ $? != 0 ]
                     then
                         return 1
                     fi
-                else
-                    echo "###${file##*/} has patched###      "
+                #else
+                    # echo "###${file##*/} has patched###      "
                 fi
             fi
         fi
@@ -58,19 +58,19 @@ function traverse_patch_dir()
         # ATV don't apply AOSP patch
         if [[ "$is_android_tv" == "true" && "$file" =~ "aosp_ui" ]]
         then
-            echo "###ATV version, don't need this patch:$file###      "
+            # echo "###ATV version, don't need this patch:$file###      "
             continue
         fi
         # ATV patch only patch in ATV version
         if [[ "$is_android_tv" != "true" && "$file" =~ "gtvs_ui" ]]
         then
-            echo "### AOSP version, don't need this patch:$file###      "
+            #echo "### AOSP version, don't need this patch:$file###      "
             continue
         fi
         # if no LiveTv, don't apply tv patch
         if [[ "$need_tv_feature" != "true" && "$file" =~ "tv_platform" ]]
         then
-            echo "###no need tv featrue, don't need this patch:$file###      "
+            #echo "###no need tv featrue, don't need this patch:$file###      "
             continue
         fi
 
