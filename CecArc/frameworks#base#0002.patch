@@ -1,0 +1,30 @@
+From 4bab053e3ebdaf991878926e3a40ffae2a9aef0b Mon Sep 17 00:00:00 2001
+From: Jinping Wang <jinping.wang@amlogic.com>
+Date: Tue, 2 Oct 2018 17:32:58 +0800
+Subject: [PATCH] AudioService:set resolvedStream as AudioSystem.STREAM_RING
+ when suppress [3/3]
+
+PD# SWPL-315
+
+Change-Id: I0f59d919e9ddf5ef989c4025025397a5d391c802
+AudioService:set resolvedStream as AudioSystem.STREAM_RING when suppress
+---
+ services/core/java/com/android/server/audio/AudioService.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/audio/AudioService.java b/services/core/java/com/android/server/audio/AudioService.java
+index d1de55d..0280df9 100644
+--- a/services/core/java/com/android/server/audio/AudioService.java
++++ b/services/core/java/com/android/server/audio/AudioService.java
+@@ -7428,7 +7428,7 @@ public class AudioService extends IAudioService.Stub
+                 return false;
+             }
+             boolean suppress = false;
+-            if (resolvedStream == DEFAULT_VOL_STREAM_NO_PLAYBACK && mController != null) {
++            if (resolvedStream == AudioSystem.STREAM_RING && mController != null) {
+                 final long now = SystemClock.uptimeMillis();
+                 if ((flags & AudioManager.FLAG_SHOW_UI) != 0 && !mVisible) {
+                     // ui will become visible
+-- 
+2.10.2
+
