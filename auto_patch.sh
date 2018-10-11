@@ -16,7 +16,7 @@
 function auto_patch()
 {
     local patch_dir=$1
-    echo "###patch_dir ${patch_dir##*/}###      "
+    echo "###patch_dir ${patch_dir##*/} "
 
     for file in $patch_dir/*
     do
@@ -30,17 +30,19 @@ function auto_patch()
             local change_id=`grep 'Change-Id' $file | cut -f 2 -d " "`
             if [ -d "$dir" ]
             then
-                cd $dir; git log | grep $change_id 1>/dev/null 2>&1;
-                if [ $? -ne 0 ]; then
+                cd $dir; #git log | grep $change_id 1>/dev/null 2>&1;
+                #if [ $? -ne 0 ]; then
                     #echo "###patch ${file##*/}###      "
-                    cd $dir; git am $file;
+                    cd $dir; git am -q $file 1>/dev/null 2>&1;
                     if [ $? != 0 ]
                     then
+                        git am --abort
+                        echo "failed,maybe already patched    "
                         return 1
                     fi
                 #else
                     # echo "###${file##*/} has patched###      "
-                fi
+               # fi
             fi
         fi
     done
