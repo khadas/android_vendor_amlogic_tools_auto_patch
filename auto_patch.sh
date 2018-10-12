@@ -88,13 +88,20 @@ function traverse_patch_dir()
 T=$(pwd)
 LOCAL_PATH=$T/$(dirname $0)/
 
-#if [ -f "$LOCAL_PATH.patched" ]
-#then
-#    echo "auto patch already applied!"
-#    exit 0
-#else
-#    touch $LOCAL_PATH.patched
-#fi
+if [ "$1" = "clean" ]
+then
+    echo "clean auto patch flag"
+    rm $LOCAL_PATH.patched -f
+    exit 0
+fi
+
+if [ -f "$LOCAL_PATH.patched" ]
+then
+    echo "auto patch already applied!"
+    exit 0
+else
+    touch $LOCAL_PATH.patched
+fi
 
 need_tv_feature=$1
 is_android_tv=$2
