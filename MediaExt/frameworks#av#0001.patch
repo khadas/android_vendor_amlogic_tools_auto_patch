@@ -1,4 +1,4 @@
-From 83dc5e1a4ca7ae1109bcc40d8820cc3b66962275 Mon Sep 17 00:00:00 2001
+From 203035a508515d32e29f35a143733b49d75c9ae2 Mon Sep 17 00:00:00 2001
 From: rongrong zhou <rongrong.zhou@amlogic.com>
 Date: Thu, 23 Aug 2018 14:06:03 +0800
 Subject: [PATCH] mediaext: merge media ext from o
@@ -7,6 +7,7 @@ PD# 169059
 
 1. merge media ext from O
 2. add convertMetaDataToMessage
+3. add amnuplayer use StagefrightMetadataRetriever
 
 Change-Id: Id459123b4bd7b9e7b5f0c548fe4118b7011384a4
 ---
@@ -15,13 +16,14 @@ Change-Id: Id459123b4bd7b9e7b5f0c548fe4118b7011384a4
  .../include/common/AVExtensionsCommon.h            | 69 +++++++++++++++
  .../include/stagefright/AVExtensions.h             | 77 +++++++++++++++++
  media/libavextensions/stagefright/AVUtils.cpp      | 99 ++++++++++++++++++++++
+ .../MetadataRetrieverClient.cpp                    |  3 +
  media/libstagefright/ACodec.cpp                    | 23 ++++-
  media/libstagefright/Android.bp                    |  5 ++
  media/libstagefright/Utils.cpp                     |  7 ++
  media/libstagefright/xmlparser/Android.bp          | 22 +++++
  .../xmlparser/MediaCodecsXmlParser.cpp             |  5 +-
  .../stagefright/xmlparser/MediaCodecsXmlParser.h   |  5 +-
- 11 files changed, 460 insertions(+), 6 deletions(-)
+ 12 files changed, 463 insertions(+), 6 deletions(-)
  create mode 100644 media/libavextensions/Android.bp
  create mode 100644 media/libavextensions/common/ExtensionsLoader.hpp
  create mode 100644 media/libavextensions/include/common/AVExtensionsCommon.h
@@ -457,6 +459,20 @@ index 0000000..94ec072
 +
 +} //namespace android
 +
+diff --git a/media/libmediaplayerservice/MetadataRetrieverClient.cpp b/media/libmediaplayerservice/MetadataRetrieverClient.cpp
+index 40b17bf..d829c3b 100644
+--- a/media/libmediaplayerservice/MetadataRetrieverClient.cpp
++++ b/media/libmediaplayerservice/MetadataRetrieverClient.cpp
+@@ -98,6 +98,9 @@ static sp<MediaMetadataRetrieverBase> createRetriever(player_type playerType)
+     }
+     if (p == NULL) {
+         ALOGE("failed to create a retriever object");
++        if (playerType == 112) {
++           p = new StagefrightMetadataRetriever;
++        }
+     }
+     return p;
+ }
 diff --git a/media/libstagefright/ACodec.cpp b/media/libstagefright/ACodec.cpp
 index 7f39d10..df7a0ae 100644
 --- a/media/libstagefright/ACodec.cpp
@@ -559,7 +575,7 @@ index 48e351b..2267c69 100644
  
      product_variables: {
 diff --git a/media/libstagefright/Utils.cpp b/media/libstagefright/Utils.cpp
-index cf5e91e..026ccbb 100644
+index ada37a6..a5cf94b 100644
 --- a/media/libstagefright/Utils.cpp
 +++ b/media/libstagefright/Utils.cpp
 @@ -45,6 +45,10 @@
