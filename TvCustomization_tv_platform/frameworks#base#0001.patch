@@ -1,0 +1,38 @@
+From ecff1b912567579eae17ff8c82fa25991a916a63 Mon Sep 17 00:00:00 2001
+From: Lei Qian <lei.qian@amlogic.com>
+Date: Tue, 23 Oct 2018 17:18:54 +0800
+Subject: [PATCH] WindowState:  fixed OverlayView can't display issue [1/1]
+
+PD#SWPL-745
+
+Problem:
+OverlayView can't display
+
+Solotion:
+setRelativeLayer for TYPE_APPLICATION_MEDIA_OVERLAY
+
+Verify:
+verify by einstein
+
+Change-Id: I4828e60d7c915076013fb2b5666512a89416b1b7
+Signed-off-by: Lei Qian <lei.qian@amlogic.com>
+---
+ services/core/java/com/android/server/wm/WindowState.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/wm/WindowState.java b/services/core/java/com/android/server/wm/WindowState.java
+index 1ae680f..13b6923 100644
+--- a/services/core/java/com/android/server/wm/WindowState.java
++++ b/services/core/java/com/android/server/wm/WindowState.java
+@@ -4841,7 +4841,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
+             if (w.mAttrs.type == TYPE_APPLICATION_MEDIA) {
+                 w.assignLayer(t, -2);
+             } else if (w.mAttrs.type == TYPE_APPLICATION_MEDIA_OVERLAY) {
+-                w.assignLayer(t, -1);
++                w.assignRelativeLayer(t, mWinAnimator.mSurfaceController.mSurfaceControl, -1);
+             } else {
+                 w.assignLayer(t, layer);
+             }
+-- 
+1.9.1
+
