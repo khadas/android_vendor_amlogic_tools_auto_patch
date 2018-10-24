@@ -1,7 +1,7 @@
-From ecff1b912567579eae17ff8c82fa25991a916a63 Mon Sep 17 00:00:00 2001
+From f6cb49bf7df8643f979bfa5d7a0fc71f7f7fd3f6 Mon Sep 17 00:00:00 2001
 From: Lei Qian <lei.qian@amlogic.com>
 Date: Tue, 23 Oct 2018 17:18:54 +0800
-Subject: [PATCH] WindowState:  fixed OverlayView can't display issue [1/1]
+Subject: [PATCH] WindowState: fixed OverlayView can't display issue [1/1]
 
 PD#SWPL-745
 
@@ -17,19 +17,23 @@ verify by einstein
 Change-Id: I4828e60d7c915076013fb2b5666512a89416b1b7
 Signed-off-by: Lei Qian <lei.qian@amlogic.com>
 ---
- services/core/java/com/android/server/wm/WindowState.java | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ services/core/java/com/android/server/wm/WindowState.java | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/services/core/java/com/android/server/wm/WindowState.java b/services/core/java/com/android/server/wm/WindowState.java
-index 1ae680f..13b6923 100644
+index 1ae680f..1d81850 100644
 --- a/services/core/java/com/android/server/wm/WindowState.java
 +++ b/services/core/java/com/android/server/wm/WindowState.java
-@@ -4841,7 +4841,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
+@@ -4841,7 +4841,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
              if (w.mAttrs.type == TYPE_APPLICATION_MEDIA) {
                  w.assignLayer(t, -2);
              } else if (w.mAttrs.type == TYPE_APPLICATION_MEDIA_OVERLAY) {
 -                w.assignLayer(t, -1);
-+                w.assignRelativeLayer(t, mWinAnimator.mSurfaceController.mSurfaceControl, -1);
++                if (mWinAnimator.hasSurface()) {
++                    w.assignRelativeLayer(t, mWinAnimator.mSurfaceController.mSurfaceControl, -1);
++                } else {
++                    w.assignLayer(t, -1);
++                }
              } else {
                  w.assignLayer(t, layer);
              }
