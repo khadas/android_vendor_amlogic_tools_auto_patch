@@ -67,7 +67,7 @@ index e998d5f..bf60df5 100644
 -            device3 |= (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPDIF);
 +            //modified by amlogic,if SPDIF are co-exist with others.
 +            //device3 |= (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPDIF);
-+            if (property_get_int32("ro.platform.is.tv", 0) == 0) {
++            if (property_get_int32("ro.vendor.platform.is.tv", 0) == 0) {
 +                device3 |= (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPDIF);
 +            }
              device3 |= (availableOutputDevicesType & AUDIO_DEVICE_OUT_AUX_LINE);
