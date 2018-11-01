@@ -1,4 +1,4 @@
-From be82c15819432d72f21e2a0040aa35d5b2de7135 Mon Sep 17 00:00:00 2001
+From 7452c619f7a94f60ad979561815454f5eaff47f0 Mon Sep 17 00:00:00 2001
 From: Ting Li <ting.li@amlogic.com>
 Date: Mon, 17 Sep 2018 10:53:51 +0800
 Subject: [PATCH] Power: add focus for long press power action and powerkey
@@ -14,8 +14,8 @@ Change-Id: Ic348b1fb595a53ad538abb5d919cc18c0f822013
  .../SystemUI/res/layout/global_actions_item.xml    |  3 ++-
  packages/SystemUI/res/values/colors.xml            |  2 ++
  .../globalactions/GlobalActionsDialog.java         |  3 +++
- .../android/server/policy/PhoneWindowManager.java  | 24 +++++++++++++++++++--
- 5 files changed, 54 insertions(+), 3 deletions(-)
+ .../android/server/policy/PhoneWindowManager.java  | 21 ++++++++++++++++--
+ 5 files changed, 51 insertions(+), 3 deletions(-)
  create mode 100644 packages/SystemUI/res/drawable/powerkey_long_press_selector.xml
 
 diff --git a/packages/SystemUI/res/drawable/powerkey_long_press_selector.xml b/packages/SystemUI/res/drawable/powerkey_long_press_selector.xml
@@ -91,7 +91,7 @@ index d232108..2111a35 100644
          }
  
 diff --git a/services/core/java/com/android/server/policy/PhoneWindowManager.java b/services/core/java/com/android/server/policy/PhoneWindowManager.java
-index 56ceda7..44443f0 100644
+index 56ceda7..0aa70cf 100644
 --- a/services/core/java/com/android/server/policy/PhoneWindowManager.java
 +++ b/services/core/java/com/android/server/policy/PhoneWindowManager.java
 @@ -1387,7 +1387,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
@@ -104,7 +104,7 @@ index 56ceda7..44443f0 100644
                      if ((event.getFlags() & KeyEvent.FLAG_LONG_PRESS) != 0) {
                          powerLongPress();
                      } else {
-@@ -1435,7 +1436,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+@@ -1435,7 +1436,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
              }
          }
      }
@@ -114,16 +114,13 @@ index 56ceda7..44443f0 100644
 +    static final int POWER_KEY_RESTART = 2;
  
 +    private int whichPowerKeyDefinition() {
-+        int default_value = 0;
-+        if (SystemProperties.getBoolean("ro.platform.has.tvuimode", false)) {
-+            default_value = 1;
-+        }
++        int default_value = POWER_KEY_SUSPEND;
 +        return Settings.System.getInt(mContext.getContentResolver(), POWER_KEY_DEFINITION, default_value);
 +    }
      private void interceptPowerKeyUp(KeyEvent event, boolean interactive, boolean canceled) {
          final boolean handled = canceled || mPowerKeyHandled;
          mScreenshotChordPowerKeyTriggered = false;
-@@ -1500,7 +1512,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+@@ -1500,7 +1509,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
          Slog.d(TAG, "powerPress: eventTime=" + eventTime + " interactive=" + interactive
                  + " count=" + count + " beganFromNonInteractive=" + mBeganFromNonInteractive +
                  " mShortPressOnPowerBehavior=" + mShortPressOnPowerBehavior);
@@ -133,7 +130,7 @@ index 56ceda7..44443f0 100644
 +            mPowerManager.shutdown(false,"userrequested",false);
 +            return;
 +        }
-+        if (definedPowerKey == POWER_KEY_RESTART && !SystemProperties.getBoolean("ro.platform.has.tvuimode", false)) {
++        if (definedPowerKey == POWER_KEY_RESTART) {
 +            mPowerManager.reboot("");
 +            return;
 +        }
