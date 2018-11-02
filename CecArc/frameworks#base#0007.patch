@@ -1,0 +1,216 @@
+From dc4b9ccca57ad20090c55195f046a6214b5061fb Mon Sep 17 00:00:00 2001
+From: Jinping Wang <jinping.wang@amlogic.com>
+Date: Wed, 31 Oct 2018 14:25:36 +0800
+Subject: [PATCH] cec: cec-framework [1/1]
+
+PD# SWPL-731
+
+Problem:
+ro.hdmi.set_menu_language default not true for playback
+
+Solution:
+set ro.hdmi.set_menu_language default is true
+
+Verify:
+test ok using r311
+
+Change-Id: If74412207c960428125f569a98f7c14035af317a
+Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
+---
+ .../server/hdmi/HdmiCecLocalDevicePlayback.java    | 107 ++++++++++++++++++++-
+ .../android/server/hdmi/HdmiCecMessageBuilder.java |  11 +++
+ 2 files changed, 116 insertions(+), 2 deletions(-)
+
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
+index b3aef04..4572691 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
+@@ -37,6 +37,8 @@ import java.util.List;
+ import java.util.Locale;
+ 
+ import java.util.List;
++import android.os.Handler;
++import android.os.Message;
+ 
+ /**
+  * Represent a logical device of type Playback residing in Android system.
+@@ -48,7 +50,7 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+             SystemProperties.getBoolean(Constants.PROPERTY_WAKE_ON_HOTPLUG, true);
+ 
+     private static final boolean SET_MENU_LANGUAGE =
+-            SystemProperties.getBoolean(Constants.PROPERTY_SET_MENU_LANGUAGE, false);
++            SystemProperties.getBoolean(Constants.PROPERTY_SET_MENU_LANGUAGE, true);
+ 
+     private boolean mIsActiveSource = false;
+ 
+@@ -68,6 +70,22 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+     // TODO(amyjojo): adding system constants for input ports to TIF mapping.
+     private int mLocalActivePath = 0;
+ 
++    private static final int MSG_GET_MENU_LANGUAGE_TIMEOUT = 5;
++    private static final int GET_MSG_TIMEOUT = 15000;
++    private final Handler mPBHandler =
++            new Handler() {
++                @Override
++                public void handleMessage(Message msg) {
++                    switch (msg.what) {
++                        case MSG_GET_MENU_LANGUAGE_TIMEOUT:
++                            sendGetMenuLanguageCommand(Constants.ADDR_TV);
++                            break;
++                        default:
++                            break;
++                    }
++                }
++            };
++
+     HdmiCecLocalDevicePlayback(HdmiControlService service) {
+         super(service, HdmiDeviceInfo.DEVICE_PLAYBACK);
+ 
+@@ -86,6 +104,8 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+                 mAddress, mService.getPhysicalAddress(), mDeviceType));
+         mService.sendCecCommand(HdmiCecMessageBuilder.buildDeviceVendorIdCommand(
+                 mAddress, mService.getVendorId()));
++        mPBHandler.sendMessageDelayed(
++                Message.obtain(mPBHandler, MSG_GET_MENU_LANGUAGE_TIMEOUT), GET_MSG_TIMEOUT);
+         startQueuedActions();
+     }
+ 
+@@ -165,6 +185,11 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+         if (!connected) {
+             getWakeLock().release();
+         }
++        if (connected) {
++            mPBHandler.removeMessages(MSG_GET_MENU_LANGUAGE_TIMEOUT);
++            mPBHandler.sendMessageDelayed(
++                    Message.obtain(mPBHandler, MSG_GET_MENU_LANGUAGE_TIMEOUT), GET_MSG_TIMEOUT/2);
++        }
+     }
+ 
+     @Override
+@@ -337,9 +362,19 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+         if (!SET_MENU_LANGUAGE) {
+             return false;
+         }
+-
+         try {
+             String iso3Language = new String(message.getParams(), 0, 3, "US-ASCII");
++            HdmiLogger.debug("handleSetMenuLanguage, iso3Language: " + iso3Language);
++            if (iso3Language.equals("chi") || iso3Language.equals("zho")) {
++                HdmiCecLanguageHelp cecLanguage = new HdmiCecLanguageHelp(iso3Language);
++                Locale locale = new Locale(cecLanguage.LanguageCode(), cecLanguage.CountryCode());
++                try {
++                    LocalePicker.updateLocale(locale);
++                } catch (Exception e) {
++                    e.printStackTrace();
++                }
++                return true;
++            }
+             Locale currentLocale = mService.getContext().getResources().getConfiguration().locale;
+             if (currentLocale.getISO3Language().equals(iso3Language)) {
+                 // Do not switch language if the new language is the same as the current one.
+@@ -371,6 +406,14 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+         }
+     }
+ 
++    protected void sendGetMenuLanguageCommand(int dest) {
++        if (!SET_MENU_LANGUAGE) {
++            return;
++        }
++        int targetAddress = Constants.ADDR_TV;
++        mService.sendCecCommand(HdmiCecMessageBuilder.buildGetMenuLanguage(mAddress, targetAddress));
++    }
++
+     @Override
+     protected int findKeyReceiverAddress() {
+         return Constants.ADDR_TV;
+@@ -417,6 +460,66 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+         pw.println("mAutoTvOff:" + mAutoTvOff);
+     }
+ 
++    class HdmiCecLanguageHelp {
++        private final String [][] mCecLanguage = {
++            {"chi", "zh", "CN"},
++            {"zho", "zh", "TW"}
++        };
++
++        private int mIndex;
++
++        HdmiCecLanguageHelp(String str) {
++            int size;
++            for (size = 0; size < mCecLanguage.length; size++) {
++                if (mCecLanguage[size][0].equals(str)) {
++                    mIndex = size;
++                    break;
++                }
++            }
++            if (size == mCecLanguage.length) {
++                mIndex = -1;
++            }
++        }
++
++        public String LanguageCode() {
++            if (mIndex != -1) {
++                return mCecLanguage[mIndex][1];
++            }
++            return null;
++        }
++
++        public String CountryCode() {
++            if (mIndex != -1) {
++                return mCecLanguage[mIndex][2];
++            }
++            return null;
++        }
++
++        /*
++         * get android language code for cec language code
++         */
++        public final String getCecLanguageCode(String cecLanguage) {
++            int size;
++            for (size = 0; size < mCecLanguage.length; size++) {
++                if (mCecLanguage[size][0].equals(cecLanguage))
++                    return mCecLanguage[size][1];
++            }
++            return null;
++        }
++
++        /*
++         * get android country code for cec language code
++         */
++        public final String getCecCountryCode(String cecLanguage) {
++            int size;
++            for (size = 0; size < mCecLanguage.length; size++) {
++                if (mCecLanguage[size][0].equals(cecLanguage))
++                    return mCecLanguage[size][2];
++            }
++            return null;
++        }
++    }
++
+     // Wrapper interface over PowerManager.WakeLock
+     private interface ActiveWakeLock {
+         void acquire();
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java b/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java
+index f9f1edb..2692101 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java
+@@ -554,6 +554,17 @@ public class HdmiCecMessageBuilder {
+     }
+ 
+     /**
++     * Build &lt;GetMenuLanguage&gt; command.
++     *
++     * @param src source address of command
++     * @param dest destination address of command
++     * @return newly created {@link HdmiCecMessage}
++     */
++    public static HdmiCecMessage buildGetMenuLanguage(int src, int dest) {
++        return buildCommand(src, dest, Constants.MESSAGE_GET_MENU_LANGUAGE);
++    }
++
++    /**
+      * Build &lt;Vendor Command&gt; command.
+      *
+      * @param src source address of command
+-- 
+2.10.2
