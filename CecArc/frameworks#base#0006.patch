@@ -1,0 +1,87 @@
+From 91a56a39d2e6d5cd12ae0e7a6d94c4817e106f1e Mon Sep 17 00:00:00 2001
+From: Jinping Wang <jinping.wang@amlogic.com>
+Date: Fri, 26 Oct 2018 14:33:47 +0800
+Subject: [PATCH] cec: cec-framework [1/1]
+
+PD# SWPL-735
+
+Problem:
+receive incorrect otp msg when input changed
+
+Solution:
+filter otp msg when change input
+
+Verify:
+test ok using r311
+
+Change-Id: I03f7960fd172e4d234e300dfde8b0807dd3498f8
+---
+ .../core/java/com/android/server/hdmi/HdmiCecLocalDevice.java  | 10 +++++++++-
+ .../java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java     | 10 ++++++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
+index b4b1c47..541bd6f 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
+@@ -64,6 +64,10 @@ abstract class HdmiCecLocalDevice {
+     protected HdmiDeviceInfo mDeviceInfo;
+     protected int mLastKeycode = HdmiCecKeycode.UNSUPPORTED_KEYCODE;
+     protected int mLastKeyRepeatCount = 0;
++    protected static final int MSG_SELECT_PORT_FLAGS = 3;
++    protected static final int DELAY_TIMEOUT_MS = 5000;
++    protected static int mSelectedPortId = -1;
++    protected static boolean mFilterOtpEnabled = false;
+ 
+     static class ActiveSource {
+         int logicalAddress;
+@@ -147,7 +151,7 @@ abstract class HdmiCecLocalDevice {
+     // Note that access to this collection should happen in service thread.
+     private final ArrayList<HdmiCecFeatureAction> mActions = new ArrayList<>();
+ 
+-    private final Handler mHandler =
++    protected final Handler mHandler =
+             new Handler() {
+                 @Override
+                 public void handleMessage(Message msg) {
+@@ -158,6 +162,10 @@ abstract class HdmiCecLocalDevice {
+                         case MSG_USER_CONTROL_RELEASE_TIMEOUT:
+                             handleUserControlReleased();
+                             break;
++                        case MSG_SELECT_PORT_FLAGS:
++                            mFilterOtpEnabled = false;
++                            Slog.d(TAG, "reset mFilterOtpEnabled to false");
++                            break;
+                     }
+                 }
+             };
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
+index 887e87c..550d040 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
+@@ -419,6 +419,12 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+         }
+         int newPath = mService.portIdToPath(portId);
+         startRoutingControl(oldPath, newPath, true, callback);
++        if (mSelectedPortId != -1 && mSelectedPortId != portId) {
++            mFilterOtpEnabled = true;
++            mHandler.removeMessages(MSG_SELECT_PORT_FLAGS);
++            mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_SELECT_PORT_FLAGS, 0, 0), DELAY_TIMEOUT_MS);
++        }
++        mSelectedPortId = portId;
+     }
+ 
+     @ServiceThreadOnly
+@@ -471,6 +477,10 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+     protected boolean handleActiveSource(HdmiCecMessage message) {
+         assertRunOnServiceThread();
+         int logicalAddress = message.getSource();
++        if (mFilterOtpEnabled) {
++            Slog.d(TAG,"filter Active Source Msg, logicalAddress: " + logicalAddress);
++            return true;
++        }
+         int physicalAddress = HdmiUtils.twoBytesToInt(message.getParams());
+         HdmiDeviceInfo info = getCecDeviceInfo(logicalAddress);
+         if (info == null) {
+-- 
+2.10.2
