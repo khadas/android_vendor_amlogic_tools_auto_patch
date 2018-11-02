@@ -1,0 +1,36 @@
+From 6264bea2291d3789804f5950f4f0f86c403b216a Mon Sep 17 00:00:00 2001
+From: Jinping Wang <jinping.wang@amlogic.com>
+Date: Fri, 26 Oct 2018 17:56:52 +0800
+Subject: [PATCH] cec: cec-framework [1/1]
+
+PD# SWPL-951
+
+Problem:
+not send standby msg when shutdown
+
+Solution:
+send standby msg when shutdown
+
+Verify:
+test ok using r311
+
+Change-Id: Ic21765025ea31f8ef191205a7af664593ccaf16b
+---
+ services/core/java/com/android/server/hdmi/HdmiControlService.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/hdmi/HdmiControlService.java b/services/core/java/com/android/server/hdmi/HdmiControlService.java
+index 6018383..b05e922 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiControlService.java
++++ b/services/core/java/com/android/server/hdmi/HdmiControlService.java
+@@ -2166,7 +2166,7 @@ public class HdmiControlService extends SystemService {
+ 
+         final List<HdmiCecLocalDevice> devices = getAllLocalDevices();
+ 
+-        if (!isStandbyMessageReceived() && !canGoToStandby()) {
++        if ((STANDBY_SHUTDOWN == standbyAction) ||(!isStandbyMessageReceived() && !canGoToStandby())) {
+             mPowerStatus = HdmiControlManager.POWER_STATUS_STANDBY;
+             for (HdmiCecLocalDevice device : devices) {
+                 device.onStandby(mStandbyMessageReceived, standbyAction);
+-- 
+2.10.2
