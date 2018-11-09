@@ -1,0 +1,38 @@
+From 4381ee6905d706802903c99e031cd7234364f919 Mon Sep 17 00:00:00 2001
+From: haiyuan xiong <haiyuan.xiong@amlogic.com>
+Date: Fri, 2 Nov 2018 16:19:09 +0800
+Subject: [PATCH] Display: fix sf crash used after free [1/1]
+
+PD#SWPL-1133
+
+Problem:
+crash when reloading google play movies
+
+Solution:
+add a lock
+
+Verify:
+need qa to verify
+
+Change-Id: I45ae103586e12dbb94a154ac479a3d867ef91a57
+Signed-off-by: haiyuan xiong <haiyuan.xiong@amlogic.com>
+---
+ services/surfaceflinger/SurfaceFlinger.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 28b447f..7513ac8 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -2894,7 +2894,7 @@ void SurfaceFlinger::invalidateLayerStack(const sp<const Layer>& layer, const Re
+ bool SurfaceFlinger::handlePageFlip()
+ {
+     ALOGV("handlePageFlip");
+-
++    Mutex::Autolock _l(mStateLock);
+     nsecs_t latchTime = systemTime();
+ 
+     bool visibleRegions = false;
+-- 
+2.7.4
+
