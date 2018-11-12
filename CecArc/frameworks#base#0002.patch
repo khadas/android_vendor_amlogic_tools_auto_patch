@@ -1,37 +1,37 @@
-From 0c73ebd8bed72fa35298d9e989eab2f3808335e4 Mon Sep 17 00:00:00 2001
+From aaa588d9fc9c5f42b7aeb96148a5b37215052a1f Mon Sep 17 00:00:00 2001
 From: Jinping Wang <jinping.wang@amlogic.com>
-Date: Sat, 3 Nov 2018 17:50:05 +0800
-Subject: [PATCH] cec: merge to 1 patch [1/1]
+Date: Mon, 12 Nov 2018 15:12:45 +0800
+Subject: [PATCH] cec: wakeup when routing change [1/1]
 
-PD# SWPL-887
+PD# SWPL-1147
 
 Problem:
-too much cec patch
+lack wakeup when routing change
 
 Solution:
-merge to 1 patch
+wakeup when routing change
 
 Verify:
 verify by p321
 
-Change-Id: I9b05ef7b81d14a0a17382c14f350de110358b95b
+Change-Id: Ibd43993879950e9b45ada3a6e048482423437167
 Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
 ---
  .../com/android/server/audio/AudioService.java     |  2 +-
  .../android/server/hdmi/HdmiCecLocalDevice.java    | 21 ++++-
  .../server/hdmi/HdmiCecLocalDevicePlayback.java    | 94 +++++++++++++++++++++-
- .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 17 +++-
+ .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 12 +++
  .../android/server/hdmi/HdmiCecMessageBuilder.java | 11 +++
- .../android/server/hdmi/HdmiControlService.java    |  8 +-
- .../android/server/hdmi/RoutingControlAction.java  |  7 +-
- 7 files changed, 150 insertions(+), 10 deletions(-)
+ .../android/server/hdmi/HdmiControlService.java    |  2 +-
+ .../android/server/hdmi/RoutingControlAction.java  | 30 ++++++-
+ 7 files changed, 163 insertions(+), 9 deletions(-)
  mode change 100755 => 100644 services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 
 diff --git a/services/core/java/com/android/server/audio/AudioService.java b/services/core/java/com/android/server/audio/AudioService.java
-index 13de652..7972422 100644
+index 989b989..6f2b214 100644
 --- a/services/core/java/com/android/server/audio/AudioService.java
 +++ b/services/core/java/com/android/server/audio/AudioService.java
-@@ -7392,7 +7392,7 @@ public class AudioService extends IAudioService.Stub
+@@ -7422,7 +7422,7 @@ public class AudioService extends IAudioService.Stub
                  return false;
              }
              boolean suppress = false;
@@ -43,7 +43,7 @@ index 13de652..7972422 100644
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 old mode 100755
 new mode 100644
-index 0cba76b..ab41f10
+index fbaafca..ffba380
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 @@ -45,6 +45,9 @@ abstract class HdmiCecLocalDevice {
@@ -90,7 +90,7 @@ index 0cba76b..ab41f10
              }
          }
      };
-@@ -580,6 +594,10 @@ abstract class HdmiCecLocalDevice {
+@@ -582,6 +596,10 @@ abstract class HdmiCecLocalDevice {
          // Do nothing.
      }
  
@@ -101,7 +101,7 @@ index 0cba76b..ab41f10
      protected boolean handleSetOsdName(HdmiCecMessage message) {
          // The default behavior of <Set Osd Name> is doing nothing.
          return true;
-@@ -899,6 +917,7 @@ abstract class HdmiCecLocalDevice {
+@@ -901,6 +919,7 @@ abstract class HdmiCecLocalDevice {
      @ServiceThreadOnly
      protected void sendKeyEvent(int keyCode, boolean isPressed) {
          assertRunOnServiceThread();
@@ -110,7 +110,7 @@ index 0cba76b..ab41f10
              Slog.w(TAG, "Unsupported key: " + keyCode);
              return;
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
-index d45b00b..98cc380 100644
+index d45b00b..af3feb9 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
 @@ -36,6 +36,8 @@ import java.util.List;
@@ -204,8 +204,8 @@ index d45b00b..98cc380 100644
  
 +    class HdmiCecLanguageHelp {
 +        private final String [][] mCecLanguage = {
-+            {"chi", "zh", "CN"},
-+            {"zho", "zh", "TW"}
++            {"chi", "zh", "TW"},
++            {"zho", "zh", "CN"}
 +        };
 +
 +        private int mIndex;
@@ -266,19 +266,17 @@ index d45b00b..98cc380 100644
      private interface ActiveWakeLock {
          void acquire();
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-index de0f298..0a45be7 100644
+index 4031d19..389ff34 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-@@ -300,7 +300,8 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
-             return;
-         }
-         removeAction(DeviceSelectAction.class);
--        addAndStartAction(new DeviceSelectAction(this, targetDevice, callback));
-+        invokeCallback(callback, HdmiControlManager.RESULT_SUCCESS);
-+        addAndStartAction(new DeviceSelectAction(this, targetDevice, null));
-     }
- 
+@@ -273,6 +273,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      @ServiceThreadOnly
+     void deviceSelect(int id, IHdmiControlCallback callback) {
+         assertRunOnServiceThread();
++        HdmiLogger.debug("deviceSelect deviceId: " + id);
+         HdmiDeviceInfo targetDevice = mDeviceInfos.get(id);
+         if (targetDevice == null) {
+             invokeCallback(callback, HdmiControlManager.RESULT_TARGET_NOT_AVAILABLE);
 @@ -394,6 +395,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      void doManualPortSwitching(int portId, IHdmiControlCallback callback) {
          assertRunOnServiceThread();
@@ -300,22 +298,7 @@ index de0f298..0a45be7 100644
      }
  
      @ServiceThreadOnly
-@@ -426,12 +434,13 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
-         if (oldPath == newPath) {
-             return;
-         }
-+        invokeCallback(callback, HdmiControlManager.RESULT_SUCCESS);
-         HdmiCecMessage routingChange =
-                 HdmiCecMessageBuilder.buildRoutingChange(mAddress, oldPath, newPath);
-         mService.sendCecCommand(routingChange);
-         removeAction(RoutingControlAction.class);
-         addAndStartAction(
--                new RoutingControlAction(this, newPath, queryDevicePowerStatus, callback));
-+                new RoutingControlAction(this, newPath, queryDevicePowerStatus, null));
-     }
- 
-     @ServiceThreadOnly
-@@ -468,6 +477,10 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -468,6 +476,10 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      protected boolean handleActiveSource(HdmiCecMessage message) {
          assertRunOnServiceThread();
          int logicalAddress = message.getSource();
@@ -349,45 +332,43 @@ index 9a51e3c..06ee301 100644
       *
       * @param src source address of command
 diff --git a/services/core/java/com/android/server/hdmi/HdmiControlService.java b/services/core/java/com/android/server/hdmi/HdmiControlService.java
-index b06dba9..af61986 100644
+index dd8b7eb..75e294f 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiControlService.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiControlService.java
-@@ -392,6 +392,13 @@ public final class HdmiControlService extends SystemService {
-         mCecController = HdmiCecController.create(this);
-         if (mCecController != null) {
-             if (mHdmiControlEnabled) {
-+                mHandler.post(new Runnable() {
-+                    @Override
-+                    public void run() {
-+                        initializeCec(INITIATED_BY_BOOT_UP);
-+                        initPortInfo();
-+                    }
-+                });
-                 initializeCec(INITIATED_BY_BOOT_UP);
-             }
-         } else {
-@@ -405,7 +412,6 @@ public final class HdmiControlService extends SystemService {
-         }
-         mMhlDevices = Collections.emptyList();
- 
--        initPortInfo();
-         mMessageValidator = new HdmiCecMessageValidator(this);
-         publishBinderService(Context.HDMI_CONTROL_SERVICE, new BinderService());
- 
+@@ -1321,7 +1321,7 @@ public final class HdmiControlService extends SystemService {
+         @Override
+         public void sendKeyEvent(final int deviceType, final int keyCode, final boolean isPressed) {
+             enforceAccessPermission();
+-            runOnServiceThread(new Runnable() {
++            runOnServiceThreadAtFrontOfQueue(new Runnable() {
+                 @Override
+                 public void run() {
+                     HdmiMhlLocalDeviceStub device = mMhlController.getLocalDevice(mActivePortId);
 diff --git a/services/core/java/com/android/server/hdmi/RoutingControlAction.java b/services/core/java/com/android/server/hdmi/RoutingControlAction.java
-index 6c8694e..0dc853b 100644
+index 6c8694e..6c56609 100644
 --- a/services/core/java/com/android/server/hdmi/RoutingControlAction.java
 +++ b/services/core/java/com/android/server/hdmi/RoutingControlAction.java
-@@ -88,6 +88,8 @@ final class RoutingControlAction extends HdmiCecFeatureAction {
+@@ -66,7 +66,7 @@ final class RoutingControlAction extends HdmiCecFeatureAction {
+     // <Inactive Source> command.
+     private final boolean mNotifyInputChange;
+ 
+-    @Nullable private final IHdmiControlCallback mCallback;
++    @Nullable private IHdmiControlCallback mCallback;
+ 
+     // The latest routing path. Updated by each <Routing Information> from CEC switches.
+     private int mCurrentRoutingPath;
+@@ -88,6 +88,10 @@ final class RoutingControlAction extends HdmiCecFeatureAction {
      public boolean start() {
          mState = STATE_WAIT_FOR_ROUTING_INFORMATION;
          addTimer(mState, TIMEOUT_ROUTING_INFORMATION_MS);
 +        tv().setPrevPortId(tv().getActivePortId());
 +        tv().setActivePath(mCurrentRoutingPath);
++        finishWithCallback(HdmiControlManager.RESULT_SUCCESS);
++        mCallback = null;
          return true;
      }
  
-@@ -105,6 +107,7 @@ final class RoutingControlAction extends HdmiCecFeatureAction {
+@@ -105,6 +109,7 @@ final class RoutingControlAction extends HdmiCecFeatureAction {
                  return true;
              }
              mCurrentRoutingPath = routingPath;
@@ -395,9 +376,28 @@ index 6c8694e..0dc853b 100644
              // Stop possible previous routing change sequence if in progress.
              removeActionExcept(RoutingControlAction.class, this);
              addTimer(mState, TIMEOUT_ROUTING_INFORMATION_MS);
-@@ -128,9 +131,7 @@ final class RoutingControlAction extends HdmiCecFeatureAction {
+@@ -123,14 +128,26 @@ final class RoutingControlAction extends HdmiCecFeatureAction {
+             if (isPowerOnOrTransient(devicePowerStatus)) {
+                 sendSetStreamPath();
+             }
++            if (isPowerOffOrTransient(devicePowerStatus)) {
++                turnOnDevice();
++            }
+         }
+         finishWithCallback(HdmiControlManager.RESULT_SUCCESS);
      }
  
++    private void turnOnDevice() {
++        HdmiDeviceInfo device = tv().getDeviceInfoByPath(mCurrentRoutingPath);
++        if (device != null) {
++            int deviceLogicalAddress = device.getLogicalAddress();
++            sendUserControlPressedAndReleased(deviceLogicalAddress,
++                    HdmiCecKeycode.CEC_KEYCODE_POWER);
++            sendUserControlPressedAndReleased(deviceLogicalAddress,
++                    HdmiCecKeycode.CEC_KEYCODE_POWER_ON_FUNCTION);
++        }
++    }
++
      private void updateActiveInput() {
 -        HdmiCecLocalDeviceTv tv = tv();
 -        tv.setPrevPortId(tv.getActivePortId());
@@ -406,6 +406,18 @@ index 6c8694e..0dc853b 100644
      }
  
      private int getTvPowerStatus() {
+@@ -142,6 +159,11 @@ final class RoutingControlAction extends HdmiCecFeatureAction {
+                 || status == HdmiControlManager.POWER_STATUS_TRANSIENT_TO_ON;
+     }
+ 
++    private static boolean isPowerOffOrTransient(int status) {
++        return status == HdmiControlManager.POWER_STATUS_STANDBY
++                || status == HdmiControlManager.POWER_STATUS_TRANSIENT_TO_STANDBY;
++    }
++
+     private void sendSetStreamPath() {
+         sendCommand(HdmiCecMessageBuilder.buildSetStreamPath(getSourceAddress(),
+                 mCurrentRoutingPath));
 -- 
 2.10.2
 
