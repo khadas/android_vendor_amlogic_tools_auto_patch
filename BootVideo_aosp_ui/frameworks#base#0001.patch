@@ -1,4 +1,4 @@
-From d414403501f718d6e47f859b92f736eb876c5851 Mon Sep 17 00:00:00 2001
+From e35233d9fbffc2d2203e19c3ea00c47303d0494e Mon Sep 17 00:00:00 2001
 From: yuehu mi <yuehu.mi@amlogic.com>
 Date: Tue, 6 Nov 2018 16:15:43 +0800
 Subject: [PATCH] Bootvideo: add bootvideo fun [1/2]
@@ -18,10 +18,10 @@ Change-Id: I741abebb165ff9ddaa65f461e4ca35e7371f05fe
 Signed-off-by: yuehu mi <yuehu.mi@amlogic.com>
 ---
  cmds/bootanimation/Android.mk        |   2 +
- cmds/bootanimation/BootAnimation.cpp | 711 ++++++++++++++++++++++++++++++++++-
- cmds/bootanimation/BootAnimation.h   |  46 +++
+ cmds/bootanimation/BootAnimation.cpp | 760 ++++++++++++++++++++++++++++++++++-
+ cmds/bootanimation/BootAnimation.h   |  49 +++
  cmds/bootanimation/bootanim.rc       |   2 +-
- 4 files changed, 756 insertions(+), 5 deletions(-)
+ 4 files changed, 807 insertions(+), 6 deletions(-)
 
 diff --git a/cmds/bootanimation/Android.mk b/cmds/bootanimation/Android.mk
 index e5d35b3..4165370 100644
@@ -37,7 +37,7 @@ index e5d35b3..4165370 100644
  
  LOCAL_INIT_RC := iot/bootanim_iot.rc
 diff --git a/cmds/bootanimation/BootAnimation.cpp b/cmds/bootanimation/BootAnimation.cpp
-index 8ffe5bf..4329de1 100644
+index 8ffe5bf..f17c93e 100644
 --- a/cmds/bootanimation/BootAnimation.cpp
 +++ b/cmds/bootanimation/BootAnimation.cpp
 @@ -98,7 +98,675 @@ static const int ANIM_ENTRY_NAME_MAX = 256;
@@ -287,7 +287,7 @@ index 8ffe5bf..4329de1 100644
 +            }
 +        }
 +    }
-+
+ 
 +    releaseAnimation(animation);
 +
 +    return true;
@@ -363,7 +363,7 @@ index 8ffe5bf..4329de1 100644
 +    // create the native surface
 +    sp<SurfaceControl> control = session()->createSurface(String8("BootVideo"),
 +            dinfo.w, dinfo.h, PIXEL_FORMAT_RGB_565);
- 
++
 +    SurfaceComposerClient::Transaction t;
 +    t.setLayer(control, LAYER_VIDEO)
 +        .apply();
@@ -733,7 +733,15 @@ index 8ffe5bf..4329de1 100644
              EGL_NONE
      };
      EGLint w, h;
-@@ -337,15 +1006,49 @@ status_t BootAnimation::readyToRun() {
+@@ -302,6 +971,7 @@ status_t BootAnimation::readyToRun() {
+     mHeight = h;
+     mFlingerSurfaceControl = control;
+     mFlingerSurface = s;
++    mTargetInset = -1;
+ 
+     // If the device has encryption turned on or is in process
+     // of being encrypted we show the encrypted boot animation.
+@@ -337,15 +1007,49 @@ status_t BootAnimation::readyToRun() {
  
  bool BootAnimation::threadLoop()
  {
@@ -786,8 +794,77 @@ index 8ffe5bf..4329de1 100644
      eglMakeCurrent(mDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
      eglDestroyContext(mDisplay, mContext);
      eglDestroySurface(mDisplay, mSurface);
+@@ -942,6 +1646,7 @@ bool BootAnimation::playAnimation(const Animation& animation)
+                 if (mClockEnabled && mTimeIsAccurate && validClock(part)) {
+                     drawClock(animation.clockFont, part.clockPosX, part.clockPosY);
+                 }
++                handleViewport(frameDuration);
+ 
+                 eglSwapBuffers(mDisplay, mSurface);
+ 
+@@ -966,7 +1671,7 @@ bool BootAnimation::playAnimation(const Animation& animation)
+             usleep(part.pause * ns2us(frameDuration));
+ 
+             // For infinite parts, we've now played them at least once, so perhaps exit
+-            if(exitPending() && !part.count)
++            if(exitPending() && !part.count && mCurrentInset >= mTargetInset)
+                 break;
+         }
+ 
+@@ -986,6 +1691,51 @@ bool BootAnimation::playAnimation(const Animation& animation)
+     return true;
+ }
+ 
++void BootAnimation::handleViewport(nsecs_t timestep) {
++    if (mShuttingDown || !mFlingerSurfaceControl || mTargetInset == 0) {
++        return;
++    }
++    if (mTargetInset < 0) {
++        // Poll the amount for the top display inset. This will return -1 until persistent properties
++        // have been loaded.
++        mTargetInset = android::base::GetIntProperty("persist.sys.displayinset.top",
++                -1 /* default */, -1 /* min */, mHeight / 2 /* max */);
++    }
++    if (mTargetInset <= 0) {
++        return;
++    }
++
++    if (mCurrentInset < mTargetInset) {
++        // After the device boots, the inset will effectively be cropped away. We animate this here.
++        float fraction = static_cast<float>(mCurrentInset) / mTargetInset;
++        int interpolatedInset = (cosf((fraction + 1) * M_PI) / 2.0f + 0.5f) * mTargetInset;
++
++        SurfaceComposerClient::Transaction()
++                .setCrop(mFlingerSurfaceControl, Rect(0, interpolatedInset, mWidth, mHeight))
++                .apply();
++    } else {
++        // At the end of the animation, we switch to the viewport that DisplayManager will apply
++        // later. This changes the coordinate system, and means we must move the surface up by
++        // the inset amount.
++        sp<IBinder> dtoken(SurfaceComposerClient::getBuiltInDisplay(
++                ISurfaceComposer::eDisplayIdMain));
++
++        Rect layerStackRect(0, 0, mWidth, mHeight - mTargetInset);
++        Rect displayRect(0, mTargetInset, mWidth, mHeight);
++
++        SurfaceComposerClient::Transaction t;
++        t.setPosition(mFlingerSurfaceControl, 0, -mTargetInset)
++                .setCrop(mFlingerSurfaceControl, Rect(0, mTargetInset, mWidth, mHeight));
++        t.setDisplayProjection(dtoken, 0 /* orientation */, layerStackRect, displayRect);
++        t.apply();
++
++        mTargetInset = mCurrentInset = 0;
++    }
++
++    int delta = timestep * mTargetInset / ms2ns(200);
++    mCurrentInset += delta;
++}
++
+ void BootAnimation::releaseAnimation(Animation* animation) const
+ {
+     for (Vector<Animation::Part>::iterator it = animation->parts.begin(),
 diff --git a/cmds/bootanimation/BootAnimation.h b/cmds/bootanimation/BootAnimation.h
-index 56e1315..93ce799 100644
+index 56e1315..deda251 100644
 --- a/cmds/bootanimation/BootAnimation.h
 +++ b/cmds/bootanimation/BootAnimation.h
 @@ -26,6 +26,11 @@
@@ -840,10 +917,11 @@ index 56e1315..93ce799 100644
      status_t initTexture(Texture* texture, AssetManager& asset, const char* name);
      status_t initTexture(FileMap* map, int* width, int* height);
      status_t initFont(Font* font, const char* fallback);
-@@ -157,6 +193,16 @@ private:
+@@ -157,11 +193,24 @@ private:
  
      void checkExit();
  
++    void handleViewport(nsecs_t timestep);
 +
 +    bool bootVideo();
 +    void bootVideoSetVolume(int status);
@@ -857,6 +935,13 @@ index 56e1315..93ce799 100644
      sp<SurfaceComposerClient>       mSession;
      AssetManager mAssets;
      Texture     mAndroid[2];
+     int         mWidth;
+     int         mHeight;
++    int         mCurrentInset;
++    int         mTargetInset;
+     bool        mUseNpotTextures = false;
+     EGLDisplay  mDisplay;
+     EGLDisplay  mContext;
 diff --git a/cmds/bootanimation/bootanim.rc b/cmds/bootanimation/bootanim.rc
 index 469c964..6b59a77 100644
 --- a/cmds/bootanimation/bootanim.rc
