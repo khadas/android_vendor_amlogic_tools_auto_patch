@@ -1,4 +1,4 @@
-From aaa588d9fc9c5f42b7aeb96148a5b37215052a1f Mon Sep 17 00:00:00 2001
+From 48d4a687cb06fbd8f66815867bb33e5a8bad4a39 Mon Sep 17 00:00:00 2001
 From: Jinping Wang <jinping.wang@amlogic.com>
 Date: Mon, 12 Nov 2018 15:12:45 +0800
 Subject: [PATCH] cec: wakeup when routing change [1/1]
@@ -22,9 +22,9 @@ Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
  .../server/hdmi/HdmiCecLocalDevicePlayback.java    | 94 +++++++++++++++++++++-
  .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 12 +++
  .../android/server/hdmi/HdmiCecMessageBuilder.java | 11 +++
- .../android/server/hdmi/HdmiControlService.java    |  2 +-
+ .../android/server/hdmi/HdmiControlService.java    | 15 +++-
  .../android/server/hdmi/RoutingControlAction.java  | 30 ++++++-
- 7 files changed, 163 insertions(+), 9 deletions(-)
+ 7 files changed, 174 insertions(+), 11 deletions(-)
  mode change 100755 => 100644 services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 
 diff --git a/services/core/java/com/android/server/audio/AudioService.java b/services/core/java/com/android/server/audio/AudioService.java
@@ -332,7 +332,7 @@ index 9a51e3c..06ee301 100644
       *
       * @param src source address of command
 diff --git a/services/core/java/com/android/server/hdmi/HdmiControlService.java b/services/core/java/com/android/server/hdmi/HdmiControlService.java
-index dd8b7eb..75e294f 100644
+index dd8b7eb..12f08b7 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiControlService.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiControlService.java
 @@ -1321,7 +1321,7 @@ public final class HdmiControlService extends SystemService {
@@ -344,6 +344,37 @@ index dd8b7eb..75e294f 100644
                  @Override
                  public void run() {
                      HdmiMhlLocalDeviceStub device = mMhlController.getLocalDevice(mActivePortId);
+@@ -2050,6 +2050,10 @@ public final class HdmiControlService extends SystemService {
+         return mWakeUpMessageReceived;
+     }
+ 
++    boolean isStandbyMessageReceived() {
++        return mStandbyMessageReceived;
++    }
++
+     @ServiceThreadOnly
+     private void onWakeUp() {
+         assertRunOnServiceThread();
+@@ -2074,12 +2078,17 @@ public final class HdmiControlService extends SystemService {
+         mPowerStatus = HdmiControlManager.POWER_STATUS_TRANSIENT_TO_STANDBY;
+         invokeVendorCommandListenersOnControlStateChanged(false,
+                 HdmiControlManager.CONTROL_STATE_CHANGED_REASON_STANDBY);
+-        if (!canGoToStandby()) {
++
++        final List<HdmiCecLocalDevice> devices = getAllLocalDevices();
++
++        if ((STANDBY_SHUTDOWN == standbyAction) ||(!isStandbyMessageReceived() && !canGoToStandby())) {
+             mPowerStatus = HdmiControlManager.POWER_STATUS_STANDBY;
++            for (HdmiCecLocalDevice device : devices) {
++                device.onStandby(mStandbyMessageReceived, standbyAction);
++            }
+             return;
+         }
+ 
+-        final List<HdmiCecLocalDevice> devices = getAllLocalDevices();
+         disableDevices(new PendingActionClearedCallback() {
+             @Override
+             public void onCleared(HdmiCecLocalDevice device) {
 diff --git a/services/core/java/com/android/server/hdmi/RoutingControlAction.java b/services/core/java/com/android/server/hdmi/RoutingControlAction.java
 index 6c8694e..6c56609 100644
 --- a/services/core/java/com/android/server/hdmi/RoutingControlAction.java
@@ -419,5 +450,5 @@ index 6c8694e..6c56609 100644
          sendCommand(HdmiCecMessageBuilder.buildSetStreamPath(getSourceAddress(),
                  mCurrentRoutingPath));
 -- 
-2.10.2
+1.9.1
 
