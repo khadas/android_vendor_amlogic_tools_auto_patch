@@ -1,35 +1,73 @@
-From ffcdaf7f2a2ef712931e90e2f4dd27a7417ece59 Mon Sep 17 00:00:00 2001
+From 0d22055bda39508fc6da8a81ba337952163105c9 Mon Sep 17 00:00:00 2001
 From: Lei Qian <lei.qian@amlogic.com>
 Date: Thu, 27 Sep 2018 12:38:53 +0800
-Subject: [PATCH] FallbackHome: set tv_user_setup_complete to 1 when firstboot
- [1/1]
+Subject: [PATCH] TvSettings: optimize FallbackHome and remove
+ Remotes&Accessories options. [1/1]
 
-PD#173290
+PD#173290 PD#SWPL-2358
 
-    only set it in AOSP version, because we have not user setup APK
-in AOSP version
+Problem:
+Crashed when select Settings-->Remotes&Accessories.
+
+Solution:
+1.Only set tv_user_setup_complete in AOSP version, because we have not user setup APK
+in AOSP version.
+2.Remove Remotes&Accessories options.
+
+Verify:
+1.Function is ok in platform eintain after modification.
+2.Verified on P321.
 
 Change-Id: I009fe829bb0affab63f6833832dd60b55ad3fe79
 Signed-off-by: Lei Qian <lei.qian@amlogic.com>
 ---
- Settings/src/com/android/tv/settings/system/FallbackHome.java | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Settings/src/com/android/tv/settings/MainFragment.java       | 12 ++++++++++++
+ .../src/com/android/tv/settings/system/FallbackHome.java     |  9 +++++++++
+ 2 files changed, 21 insertions(+)
 
+diff --git a/Settings/src/com/android/tv/settings/MainFragment.java b/Settings/src/com/android/tv/settings/MainFragment.java
+index 2a61f65..6e90a9f 100644
+--- a/Settings/src/com/android/tv/settings/MainFragment.java
++++ b/Settings/src/com/android/tv/settings/MainFragment.java
+@@ -219,6 +219,12 @@ public class MainFragment extends PreferenceControllerFragment implements
+                 accountsPref.setVisible(false);
+             }
+         }
++        if (!supportBlueTooth()) {
++            Preference accessoryPreference = findPreference(KEY_ACCESSORIES);
++            if (accessoryPreference != null) {
++                accessoryPreference.setVisible(false);
++            }
++        }
+         mHotwordSwitchController.init(this);
+     }
+ 
+@@ -473,4 +479,10 @@ public class MainFragment extends PreferenceControllerFragment implements
+             mSuggestionsList.removePreference(preference);
+         }
+     }
++
++    private boolean supportBlueTooth() {
++        return getActivity().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)
++                ? true
++                : false;
++    }
+ }
 diff --git a/Settings/src/com/android/tv/settings/system/FallbackHome.java b/Settings/src/com/android/tv/settings/system/FallbackHome.java
 index 0924606..c45a88f 100644
 --- a/Settings/src/com/android/tv/settings/system/FallbackHome.java
 +++ b/Settings/src/com/android/tv/settings/system/FallbackHome.java
 @@ -30,6 +30,10 @@ import android.util.Log;
- 
+
  import java.util.Objects;
- 
+
 +import android.content.ContentResolver;
 +import android.provider.Settings;
 +import android.os.SystemProperties;
 +
  public class FallbackHome extends Activity {
      private static final String TAG = "FallbackHome";
- 
+
 @@ -49,6 +53,11 @@ public class FallbackHome extends Activity {
      private BroadcastReceiver mReceiver = new BroadcastReceiver() {
          @Override
@@ -42,6 +80,6 @@ index 0924606..c45a88f 100644
              maybeFinish();
          }
      };
--- 
+--
 1.9.1
 
