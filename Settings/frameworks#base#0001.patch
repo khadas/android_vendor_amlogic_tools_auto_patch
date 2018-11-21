@@ -1,0 +1,50 @@
+From 52b470456e037bc19778a0e0a6b094e59308adfa Mon Sep 17 00:00:00 2001
+From: yu fang <yu.fang@amlogic.com>
+Date: Fri, 16 Nov 2018 11:00:01 +0800
+Subject: [PATCH] USB: Avoid IllegalArgumentException.[2/2]
+
+PD#SWPL-923
+
+Problem:
+IllegalArgumentException happened when selected USB configuration.
+
+Solution:
+Avoid IllegalArgumentException.
+
+Verify:
+Verified on all TV/OTT platform of android P.
+
+Change-Id: I7b9b5a24ccd5ce6df3c1bd5cf819f40d2902b5f7
+---
+ services/usb/java/com/android/server/usb/UsbDeviceManager.java | 1 +
+ services/usb/java/com/android/server/usb/UsbService.java       | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/services/usb/java/com/android/server/usb/UsbDeviceManager.java b/services/usb/java/com/android/server/usb/UsbDeviceManager.java
+index 9f8042c..956e20e 100644
+--- a/services/usb/java/com/android/server/usb/UsbDeviceManager.java
++++ b/services/usb/java/com/android/server/usb/UsbDeviceManager.java
+@@ -1567,6 +1567,7 @@ public class UsbDeviceManager implements ActivityManagerInternal.ScreenObserver
+             if (functions == null || applyAdbFunction(functions)
+                     .equals(UsbManager.USB_FUNCTION_NONE)) {
+                 functions = UsbManager.usbFunctionsToString(getChargingFunctions());
++                mCurrentFunctions = getChargingFunctions();
+             }
+             functions = applyAdbFunction(functions);
+
+diff --git a/services/usb/java/com/android/server/usb/UsbService.java b/services/usb/java/com/android/server/usb/UsbService.java
+index e92bd74..7b55441 100644
+--- a/services/usb/java/com/android/server/usb/UsbService.java
++++ b/services/usb/java/com/android/server/usb/UsbService.java
+@@ -397,7 +397,7 @@ public class UsbService extends IUsbManager.Stub {
+     @Override
+     public void setCurrentFunctions(long functions) {
+         mContext.enforceCallingOrSelfPermission(android.Manifest.permission.MANAGE_USB, null);
+-        Preconditions.checkArgument(UsbManager.areSettableFunctions(functions));
++        //Preconditions.checkArgument(UsbManager.areSettableFunctions(functions));
+         Preconditions.checkState(mDeviceManager != null);
+         mDeviceManager.setCurrentFunctions(functions);
+     }
+--
+1.9.1
+
