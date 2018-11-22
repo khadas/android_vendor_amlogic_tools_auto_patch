@@ -1,0 +1,157 @@
+From 42888054b42ba60e92ae0626f79987f9afdf1580 Mon Sep 17 00:00:00 2001
+From: Zhigang <zhigang.yu@amlogic.com>
+Date: Thu, 22 Nov 2018 13:51:30 +0800
+Subject: [PATCH] recovery: add recovery update.zip from mmcblok0[1/1]
+
+PD# SWPL-2031
+
+add recovery update from /dev/block/mmcblk0.
+
+Change-Id: I38f4e22716ca7a95f1d3320ffaf516e73fb91d68
+---
+ install.cpp | 115 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 114 insertions(+), 1 deletion(-)
+
+diff --git a/install.cpp b/install.cpp
+index d058931..1d2fcee 100644
+--- a/install.cpp
++++ b/install.cpp
+@@ -57,6 +57,10 @@
+ #include "ui.h"
+ #include "verifier.h"
+ 
++#define  CACHE_ZIPINFO   "/cache/recovery/zipinfo"
++#define  EMMC_DEVICE      "/dev/block/mmcblk0"
++#define  COPY_SIZE           (10*1024*1024)
++
+ using namespace std::chrono_literals;
+ 
+ // Default allocation of progress bar segments to operations
+@@ -561,6 +565,111 @@ bool verify_package_compatibility(ZipArchiveHandle package_zip) {
+   return false;
+ }
+ 
++int try_recovery_by_zipinfo() {
++    int len = 0;
++    int matches = 0;
++    char buf[256] = {0};
++    char filename[256] = {0};
++    int offset = 0;
++    int filesize = 0;
++
++    //open zipinfo
++    FILE *pf = fopen(CACHE_ZIPINFO, "r");
++    if (pf == NULL) {
++        printf("fopen %s failed!\n", CACHE_ZIPINFO);
++        return -1;
++    }
++
++    //fread data from zipinfo
++    len = fread(buf, 1, 256, pf);
++    fclose(pf);
++    if (len <= 0) {
++        printf("fread %s failed!\n", CACHE_ZIPINFO);
++        return -1;
++    }
++
++    //parse zipinfo
++    matches = sscanf(buf, "%s %d %d", filename, &offset, &filesize);
++    if (matches != 3) {
++        printf("fread %s error data!\n", CACHE_ZIPINFO);
++        return -1;
++    }
++
++    printf("recovery from %s offset(%d*M) length(%d) to %s\n",EMMC_DEVICE, offset, filesize, filename);
++    //open /dev/block/mmcblk0
++    int fd = 0;
++    fd = open(EMMC_DEVICE, O_RDONLY);
++    if (fd <= 0) {
++	printf("open %s failed!\n", EMMC_DEVICE);
++	return -1;
++    }
++
++    //update.zip stored offset offset
++    lseek(fd, offset*1024*1024, SEEK_SET);
++
++    //open update.zip
++    pf = fopen(filename, "w+");
++    if (pf == NULL) {
++	printf("fopen %s failed!\n", filename);
++	close(fd);
++	return -1;
++    }
++
++    //malloc buffer
++    unsigned char *tmp = (unsigned char *)malloc(COPY_SIZE);
++    if (tmp == NULL) {
++        printf("malloc 10M failed!\n");
++        close(fd);
++        fclose(pf);
++        return -1;
++    }
++
++    //data copy
++    int write_total = 0;
++    int read_one = 0;
++    printf("start to recovery update.zip!\n");
++    while(write_total < filesize) {
++	memset(tmp, 0, COPY_SIZE);
++	read_one = (filesize - write_total > COPY_SIZE) ? COPY_SIZE : filesize - write_total;
++	read(fd, tmp, read_one);
++	fwrite(tmp, 1, read_one, pf);
++	write_total += read_one;
++	printf("recovery update.zip size:%d\n", write_total);
++    }
++
++    close(fd);
++    fflush(pf);
++    fclose(pf);
++    unlink(CACHE_ZIPINFO);
++
++    return 0;
++}
++
++static int try_recovery_update_package(const char *path) {
++   int ret = 0;
++   if (strncmp(path, "/data/", 6)==0) {
++       printf("start to format data partition!\n");
++       format_volume("/data");
++   } else {
++       printf("update package not from data partition!\n");
++       return -1;
++   }
++
++   ret = ensure_path_mounted(path);
++   if (ret != 0 ) {
++       printf("mount /data after format failed!\n");
++       return -1;
++   }
++
++   ret = try_recovery_by_zipinfo();
++   if (ret < 0) {
++       printf("try recovery update package by zipinfo failed!\n");
++       return -1;
++   }
++
++   return 0;
++}
++
+ static int really_install_package(const std::string& path, bool* wipe_cache, bool needs_mount,
+                                   std::vector<std::string>* log_buffer, int retry_count,
+                                   int* max_temperature) {
+@@ -578,7 +687,11 @@ static int really_install_package(const std::string& path, bool* wipe_cache, boo
+     if (path[0] == '@') {
+       ensure_path_mounted(path.substr(1).c_str());
+     } else {
+-      ensure_path_mounted(path.c_str());
++        int ret = 0;
++        ret = ensure_path_mounted(path.c_str());
++        if (ret != 0) {
++          try_recovery_update_package(path.c_str());
++        }
+     }
+   }
+ 
+-- 
+1.9.1
+
