@@ -1,0 +1,315 @@
+From 54c3a2564ac07589eb21fd1fceb2f903dfef86bd Mon Sep 17 00:00:00 2001
+From: Ting Li <ting.li@amlogic.com>
+Date: Wed, 21 Nov 2018 18:02:00 +0800
+Subject: [PATCH] device: add imageserver for aosp only
+
+JIRA#2263
+
+Change-Id: I3f9b247a499f72950c9aaccb0fa7f492d542ec89
+Signed-off-by: Ting Li <ting.li@amlogic.com>
+---
+ ampere/manifest.xml         | 9 +++++++++
+ braun/manifest.xml          | 9 +++++++++
+ curie/manifest.xml          | 9 +++++++++
+ darwin/manifest.xml         | 9 +++++++++
+ einstein/manifest.xml       | 9 +++++++++
+ franklin/manifest.xml       | 9 +++++++++
+ galilei/manifest.xml        | 9 +++++++++
+ hertz/manifest.xml          | 9 +++++++++
+ t962_p321/manifest.xml      | 9 +++++++++
+ t962_p321_720p/manifest.xml | 9 +++++++++
+ t962x2_skt/manifest.xml     | 9 +++++++++
+ t962x2_x301/manifest.xml    | 9 +++++++++
+ t962x_r314/manifest.xml     | 9 +++++++++
+ u200/manifest.xml           | 9 +++++++++
+ u221/manifest.xml           | 9 +++++++++
+ 15 files changed, 135 insertions(+)
+
+diff --git a/ampere/manifest.xml b/ampere/manifest.xml
+index 9d6de0a..59ccda7 100644
+--- a/ampere/manifest.xml
++++ b/ampere/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/braun/manifest.xml b/braun/manifest.xml
+index db56e60..956f349 100644
+--- a/braun/manifest.xml
++++ b/braun/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/curie/manifest.xml b/curie/manifest.xml
+index c7a17a7..8e5f13f 100644
+--- a/curie/manifest.xml
++++ b/curie/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/darwin/manifest.xml b/darwin/manifest.xml
+index 9c55127..9fa0e82 100644
+--- a/darwin/manifest.xml
++++ b/darwin/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/einstein/manifest.xml b/einstein/manifest.xml
+index 9c55127..9fa0e82 100644
+--- a/einstein/manifest.xml
++++ b/einstein/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/franklin/manifest.xml b/franklin/manifest.xml
+index b3b151c..11b8723 100644
+--- a/franklin/manifest.xml
++++ b/franklin/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/galilei/manifest.xml b/galilei/manifest.xml
+index 5f0d685..ec50c39 100644
+--- a/galilei/manifest.xml
++++ b/galilei/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/hertz/manifest.xml b/hertz/manifest.xml
+index f77fac1..f982d11 100644
+--- a/hertz/manifest.xml
++++ b/hertz/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="2">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.0</version>
+diff --git a/t962_p321/manifest.xml b/t962_p321/manifest.xml
+index 4055287..6a46dea 100644
+--- a/t962_p321/manifest.xml
++++ b/t962_p321/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/t962_p321_720p/manifest.xml b/t962_p321_720p/manifest.xml
+index 4055287..6a46dea 100644
+--- a/t962_p321_720p/manifest.xml
++++ b/t962_p321_720p/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/t962x2_skt/manifest.xml b/t962x2_skt/manifest.xml
+index 9c55127..9fa0e82 100644
+--- a/t962x2_skt/manifest.xml
++++ b/t962x2_skt/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/t962x2_x301/manifest.xml b/t962x2_x301/manifest.xml
+index 9c55127..9fa0e82 100644
+--- a/t962x2_x301/manifest.xml
++++ b/t962x2_x301/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/t962x_r314/manifest.xml b/t962x_r314/manifest.xml
+index 9c55127..9fa0e82 100644
+--- a/t962x_r314/manifest.xml
++++ b/t962x_r314/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/u200/manifest.xml b/u200/manifest.xml
+index 3286dad..04bf3e8 100644
+--- a/u200/manifest.xml
++++ b/u200/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/u221/manifest.xml b/u221/manifest.xml
+index 32b5ae0..ad93bae 100644
+--- a/u221/manifest.xml
++++ b/u221/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+-- 
+1.9.1
+
