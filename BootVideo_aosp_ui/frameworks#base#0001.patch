@@ -1,27 +1,28 @@
-From e35233d9fbffc2d2203e19c3ea00c47303d0494e Mon Sep 17 00:00:00 2001
+From 0fe95bb72bec9a12d27752b62f3446417e289cd2 Mon Sep 17 00:00:00 2001
 From: yuehu mi <yuehu.mi@amlogic.com>
 Date: Tue, 6 Nov 2018 16:15:43 +0800
-Subject: [PATCH] Bootvideo: add bootvideo fun [1/2]
+Subject: [PATCH] Bootvideo: fix 2s black screen between boot logo and boot
+ video [1/1]
 
-PD#SWPL-124
+PD#SWPL-2148
 
 Problem:
-No bootvideo fun
+2s black screen between boot logo and boot video
 
 Solution:
-Add bootvideo fun
+adding bootvideo to OSD or VIDEO logic control
 
 Verify:
-Verify by all project
+verify by ampere
 
 Change-Id: I741abebb165ff9ddaa65f461e4ca35e7371f05fe
 Signed-off-by: yuehu mi <yuehu.mi@amlogic.com>
 ---
  cmds/bootanimation/Android.mk        |   2 +
- cmds/bootanimation/BootAnimation.cpp | 760 ++++++++++++++++++++++++++++++++++-
+ cmds/bootanimation/BootAnimation.cpp | 765 ++++++++++++++++++++++++++++++++++-
  cmds/bootanimation/BootAnimation.h   |  49 +++
  cmds/bootanimation/bootanim.rc       |   2 +-
- 4 files changed, 807 insertions(+), 6 deletions(-)
+ 4 files changed, 812 insertions(+), 6 deletions(-)
 
 diff --git a/cmds/bootanimation/Android.mk b/cmds/bootanimation/Android.mk
 index e5d35b3..4165370 100644
@@ -37,10 +38,10 @@ index e5d35b3..4165370 100644
  
  LOCAL_INIT_RC := iot/bootanim_iot.rc
 diff --git a/cmds/bootanimation/BootAnimation.cpp b/cmds/bootanimation/BootAnimation.cpp
-index 8ffe5bf..f17c93e 100644
+index 8ffe5bf..fd81128 100644
 --- a/cmds/bootanimation/BootAnimation.cpp
 +++ b/cmds/bootanimation/BootAnimation.cpp
-@@ -98,7 +98,675 @@ static const int ANIM_ENTRY_NAME_MAX = 256;
+@@ -98,7 +98,680 @@ static const int ANIM_ENTRY_NAME_MAX = 256;
  static constexpr size_t TEXT_POS_LEN_MAX = 16;
  
  // ---------------------------------------------------------------------------
@@ -287,7 +288,7 @@ index 8ffe5bf..f17c93e 100644
 +            }
 +        }
 +    }
- 
++
 +    releaseAnimation(animation);
 +
 +    return true;
@@ -377,7 +378,7 @@ index 8ffe5bf..f17c93e 100644
 +        ALOGE("%s, open %s failed", __FUNCTION__, mBootVideoFileName.string());
 +        return false;
 +    }
-+
+ 
 +    mMediaPlayer = new MediaPlayer();
 +    sp<BootVideoListener> listener = new BootVideoListener();
 +    mMediaPlayer->setListener(listener);
@@ -405,13 +406,18 @@ index 8ffe5bf..f17c93e 100644
 +        }
 +
 +        if ((mConfig == CONFIG_BOOTVIDEO_BOOTANIM) || (mConfig == CONFIG_BOOTVIDEO)) {
-+            t.setLayer(mFlingerSurfaceControl, LAYER_VIDEO_VOL_UI_SHOW)
-+                .apply();
++            if (mDisplayMode == 1) {
++                t.setLayer(mFlingerSurfaceControl, LAYER_VIDEO_VOL_UI_SHOW)
++                    .apply();
++            }
 +        } else {
 +            t.setLayer(mFlingerSurfaceControl, LAYER_VIDEO_VOL_UI_HIDE)
 +                .apply();
 +        }
-+        eglSwapBuffers(mDisplay, mSurface);
++
++        if (mDisplayMode == 1) {
++            eglSwapBuffers(mDisplay, mSurface);
++        }
 +
 +        mInputReaderThread = new InputReaderThread(this);
 +        mInputReaderThread->run("BootAnimation::InputReaderThread", PRIORITY_NORMAL);
@@ -716,7 +722,7 @@ index 8ffe5bf..f17c93e 100644
  BootAnimation::BootAnimation(sp<Callbacks> callbacks)
          : Thread(false), mClockEnabled(true), mTimeIsAccurate(false),
          mTimeFormat12Hour(false), mTimeCheckThread(NULL), mCallbacks(callbacks) {
-@@ -261,7 +929,7 @@ status_t BootAnimation::readyToRun() {
+@@ -261,7 +934,7 @@ status_t BootAnimation::readyToRun() {
  
      // create the native surface
      sp<SurfaceControl> control = session()->createSurface(String8("BootAnimation"),
@@ -725,7 +731,7 @@ index 8ffe5bf..f17c93e 100644
  
      SurfaceComposerClient::Transaction t;
      t.setLayer(control, 0x40000000)
-@@ -275,6 +943,7 @@ status_t BootAnimation::readyToRun() {
+@@ -275,6 +948,7 @@ status_t BootAnimation::readyToRun() {
              EGL_GREEN_SIZE, 8,
              EGL_BLUE_SIZE,  8,
              EGL_DEPTH_SIZE, 0,
@@ -733,7 +739,7 @@ index 8ffe5bf..f17c93e 100644
              EGL_NONE
      };
      EGLint w, h;
-@@ -302,6 +971,7 @@ status_t BootAnimation::readyToRun() {
+@@ -302,6 +976,7 @@ status_t BootAnimation::readyToRun() {
      mHeight = h;
      mFlingerSurfaceControl = control;
      mFlingerSurface = s;
@@ -741,7 +747,7 @@ index 8ffe5bf..f17c93e 100644
  
      // If the device has encryption turned on or is in process
      // of being encrypted we show the encrypted boot animation.
-@@ -337,15 +1007,49 @@ status_t BootAnimation::readyToRun() {
+@@ -337,15 +1012,49 @@ status_t BootAnimation::readyToRun() {
  
  bool BootAnimation::threadLoop()
  {
@@ -794,7 +800,7 @@ index 8ffe5bf..f17c93e 100644
      eglMakeCurrent(mDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
      eglDestroyContext(mDisplay, mContext);
      eglDestroySurface(mDisplay, mSurface);
-@@ -942,6 +1646,7 @@ bool BootAnimation::playAnimation(const Animation& animation)
+@@ -942,6 +1651,7 @@ bool BootAnimation::playAnimation(const Animation& animation)
                  if (mClockEnabled && mTimeIsAccurate && validClock(part)) {
                      drawClock(animation.clockFont, part.clockPosX, part.clockPosY);
                  }
@@ -802,7 +808,7 @@ index 8ffe5bf..f17c93e 100644
  
                  eglSwapBuffers(mDisplay, mSurface);
  
-@@ -966,7 +1671,7 @@ bool BootAnimation::playAnimation(const Animation& animation)
+@@ -966,7 +1676,7 @@ bool BootAnimation::playAnimation(const Animation& animation)
              usleep(part.pause * ns2us(frameDuration));
  
              // For infinite parts, we've now played them at least once, so perhaps exit
@@ -811,7 +817,7 @@ index 8ffe5bf..f17c93e 100644
                  break;
          }
  
-@@ -986,6 +1691,51 @@ bool BootAnimation::playAnimation(const Animation& animation)
+@@ -986,6 +1696,51 @@ bool BootAnimation::playAnimation(const Animation& animation)
      return true;
  }
  
