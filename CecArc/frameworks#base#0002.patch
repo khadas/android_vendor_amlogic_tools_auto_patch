@@ -1,6 +1,6 @@
-From f609c3b4ca075c36279436cdbe6bab1437cbaf4d Mon Sep 17 00:00:00 2001
+From 82cbeb4d735f1aa9ac66eaab966ff6eeafd2c0ae Mon Sep 17 00:00:00 2001
 From: Jinping Wang <jinping.wang@amlogic.com>
-Date: Mon, 26 Nov 2018 19:03:31 +0800
+Date: Mon, 3 Dec 2018 14:44:40 +0800
 Subject: [PATCH] cec: cec all patch [1/1]
 
 PD# SWPL-2438
@@ -14,17 +14,17 @@ fix cec issues
 Verify:
 verify by p321
 
-Change-Id: I37389945ee11b1f37aedfdedc43868024cb9f6ba
+Change-Id: Ibfeae68e1ef64b245bea051f04ac91cccc74acca
 Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
 ---
  .../com/android/server/audio/AudioService.java     |  2 +-
- .../android/server/hdmi/HdmiCecLocalDevice.java    | 13 ++-
+ .../android/server/hdmi/HdmiCecLocalDevice.java    | 66 ++++++++++++++-
  .../server/hdmi/HdmiCecLocalDevicePlayback.java    | 94 +++++++++++++++++++++-
- .../android/server/hdmi/HdmiCecLocalDeviceTv.java  |  2 +
+ .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 11 +++
  .../android/server/hdmi/HdmiCecMessageBuilder.java | 11 +++
  .../android/server/hdmi/HdmiControlService.java    | 15 +++-
  .../android/server/hdmi/RoutingControlAction.java  | 30 ++++++-
- 7 files changed, 156 insertions(+), 11 deletions(-)
+ 7 files changed, 217 insertions(+), 12 deletions(-)
  mode change 100755 => 100644 services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 
 diff --git a/services/core/java/com/android/server/audio/AudioService.java b/services/core/java/com/android/server/audio/AudioService.java
@@ -43,19 +43,31 @@ index 989b989..6f2b214 100644
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 old mode 100755
 new mode 100644
-index fbaafca..748181b
+index fbaafca..b94c0bb
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
-@@ -45,6 +45,8 @@ abstract class HdmiCecLocalDevice {
+@@ -35,7 +35,8 @@ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.Iterator;
+ import java.util.List;
+-
++import android.os.PowerManager;
++import android.os.PowerManager.WakeLock;
+ /**
+  * Class that models a logical CEC device hosted in this system. Handles initialization,
+  * CEC commands that call for actions customized per device type.
+@@ -45,6 +46,10 @@ abstract class HdmiCecLocalDevice {
  
      private static final int MSG_DISABLE_DEVICE_TIMEOUT = 1;
      private static final int MSG_USER_CONTROL_RELEASE_TIMEOUT = 2;
 +    protected static final int MSG_GET_MENU_LANGUAGE_TIMEOUT = 3;
++    protected static final int MSG_ACQUIRE_WAKE_LOCK = 4;
++    protected static final int MSG_RELEASE_WAKE_LOCK = 5;
 +
      // Timeout in millisecond for device clean up (5s).
      // Normal actions timeout is 2s but some of them would have several sequence of timeout.
      private static final int DEVICE_CLEANUP_TIMEOUT = 5000;
-@@ -59,6 +61,7 @@ abstract class HdmiCecLocalDevice {
+@@ -59,6 +64,7 @@ abstract class HdmiCecLocalDevice {
      protected HdmiDeviceInfo mDeviceInfo;
      protected int mLastKeycode = HdmiCecKeycode.UNSUPPORTED_KEYCODE;
      protected int mLastKeyRepeatCount = 0;
@@ -63,26 +75,34 @@ index fbaafca..748181b
  
      static class ActiveSource {
          int logicalAddress;
-@@ -129,7 +132,7 @@ abstract class HdmiCecLocalDevice {
+@@ -129,7 +135,9 @@ abstract class HdmiCecLocalDevice {
      // Note that access to this collection should happen in service thread.
      private final ArrayList<HdmiCecFeatureAction> mActions = new ArrayList<>();
  
 -    private final Handler mHandler = new Handler () {
++    private WrapperWakeLock mWakeLock;
++
 +    protected final Handler mHandler = new Handler () {
          @Override
          public void handleMessage(Message msg) {
              switch (msg.what) {
-@@ -139,6 +142,9 @@ abstract class HdmiCecLocalDevice {
+@@ -139,6 +147,15 @@ abstract class HdmiCecLocalDevice {
                  case MSG_USER_CONTROL_RELEASE_TIMEOUT:
                      handleUserControlReleased();
                      break;
 +                case MSG_GET_MENU_LANGUAGE_TIMEOUT:
 +                    sendGetMenuLanguageCommand(Constants.ADDR_TV);
 +                    break;
++                case MSG_ACQUIRE_WAKE_LOCK:
++                    getWakeLock().acquire();
++                    break;
++                case MSG_RELEASE_WAKE_LOCK:
++                    getWakeLock().release();
++                    break;
              }
          }
      };
-@@ -582,6 +588,10 @@ abstract class HdmiCecLocalDevice {
+@@ -582,6 +599,10 @@ abstract class HdmiCecLocalDevice {
          // Do nothing.
      }
  
@@ -93,7 +113,7 @@ index fbaafca..748181b
      protected boolean handleSetOsdName(HdmiCecMessage message) {
          // The default behavior of <Set Osd Name> is doing nothing.
          return true;
-@@ -901,6 +911,7 @@ abstract class HdmiCecLocalDevice {
+@@ -901,6 +922,7 @@ abstract class HdmiCecLocalDevice {
      @ServiceThreadOnly
      protected void sendKeyEvent(int keyCode, boolean isPressed) {
          assertRunOnServiceThread();
@@ -101,6 +121,53 @@ index fbaafca..748181b
          if (!HdmiCecKeycode.isSupportedKeycode(keyCode)) {
              Slog.w(TAG, "Unsupported key: " + keyCode);
              return;
+@@ -935,6 +957,46 @@ abstract class HdmiCecLocalDevice {
+         mService.sendCecCommand(HdmiCecMessageBuilder.buildUserControlReleased(
+                 mAddress, targetAddress));
+     }
++    // Wrapper interface over PowerManager.WakeLock
++    private interface WrapperWakeLock {
++        void acquire();
++        void release();
++        boolean isHeld();
++    }
++
++    private class SystemWakeLock implements WrapperWakeLock {
++        private final WakeLock mWakeLock;
++        public SystemWakeLock() {
++            mWakeLock = mService.getPowerManager().newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
++            mWakeLock.setReferenceCounted(false);
++        }
++
++        @Override
++        public void acquire() {
++            mWakeLock.acquire();
++            HdmiLogger.debug("Wake lock acquired");
++        }
++
++        @Override
++        public void release() {
++            mWakeLock.release();
++            HdmiLogger.debug("Wake lock released");
++        }
++
++        @Override
++        public boolean isHeld() {
++            return mWakeLock.isHeld();
++        }
++    }
++
++    @ServiceThreadOnly
++    private WrapperWakeLock getWakeLock() {
++        assertRunOnServiceThread();
++        if (mWakeLock == null) {
++            mWakeLock = new SystemWakeLock();
++        }
++        return mWakeLock;
++    }
+ 
+     /**
+      * Dump internal status of HdmiCecLocalDevice object.
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
 index d45b00b..af3feb9 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
@@ -258,10 +325,30 @@ index d45b00b..af3feb9 100644
      private interface ActiveWakeLock {
          void acquire();
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-index 40d6df1..f004a82 100644
+index 40d6df1..0b3438a4 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-@@ -275,6 +275,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -60,6 +60,9 @@ import java.util.Collections;
+ import java.util.HashMap;
+ import java.util.Iterator;
+ import java.util.List;
++import android.os.Handler;
++import android.os.Looper;
++import android.os.Message;
+ 
+ /**
+  * Represent a logical device of type TV residing in Android system.
+@@ -202,6 +205,9 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+     @ServiceThreadOnly
+     protected void onAddressAllocated(int logicalAddress, int reason) {
+         assertRunOnServiceThread();
++        mHandler.removeMessages(MSG_RELEASE_WAKE_LOCK);
++        mHandler.sendMessageDelayed(
++            Message.obtain(mHandler, MSG_ACQUIRE_WAKE_LOCK), 0);
+         List<HdmiPortInfo> ports = mService.getPortInfo();
+         for (HdmiPortInfo port : ports) {
+             mArcFeatureEnabled.put(port.getId(), port.isArcSupported());
+@@ -275,6 +281,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      @ServiceThreadOnly
      void deviceSelect(int id, IHdmiControlCallback callback) {
          assertRunOnServiceThread();
@@ -269,7 +356,7 @@ index 40d6df1..f004a82 100644
          HdmiDeviceInfo targetDevice = mDeviceInfos.get(id);
          if (targetDevice == null) {
              invokeCallback(callback, HdmiControlManager.RESULT_TARGET_NOT_AVAILABLE);
-@@ -396,6 +397,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -396,6 +403,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      void doManualPortSwitching(int portId, IHdmiControlCallback callback) {
          assertRunOnServiceThread();
          // Seq #20
@@ -277,6 +364,16 @@ index 40d6df1..f004a82 100644
          if (!mService.isValidPortId(portId)) {
              invokeCallback(callback, HdmiControlManager.RESULT_INCORRECT_MODE);
              return;
+@@ -1764,6 +1772,9 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+             mService.sendCecCommand(HdmiCecMessageBuilder.buildStandby(
+                     mAddress, Constants.ADDR_BROADCAST));
+         }
++        mHandler.removeMessages(MSG_RELEASE_WAKE_LOCK);
++        mHandler.sendMessageDelayed(
++            Message.obtain(mHandler, MSG_RELEASE_WAKE_LOCK), 5000);
+     }
+ 
+     boolean isProhibitMode() {
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java b/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java
 index 9a51e3c..06ee301 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java
