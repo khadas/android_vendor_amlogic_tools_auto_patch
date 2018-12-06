@@ -1,6 +1,6 @@
-From 82cbeb4d735f1aa9ac66eaab966ff6eeafd2c0ae Mon Sep 17 00:00:00 2001
+From d07ef2d2826e711e10f248d11fd6451f6b78f273 Mon Sep 17 00:00:00 2001
 From: Jinping Wang <jinping.wang@amlogic.com>
-Date: Mon, 3 Dec 2018 14:44:40 +0800
+Date: Thu, 6 Dec 2018 11:01:31 +0800
 Subject: [PATCH] cec: cec all patch [1/1]
 
 PD# SWPL-2438
@@ -14,17 +14,16 @@ fix cec issues
 Verify:
 verify by p321
 
-Change-Id: Ibfeae68e1ef64b245bea051f04ac91cccc74acca
+Change-Id: Iddc203721c1c1e4546bb86ee268341f44d3c9adf
 Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
 ---
  .../com/android/server/audio/AudioService.java     |  2 +-
- .../android/server/hdmi/HdmiCecLocalDevice.java    | 66 ++++++++++++++-
- .../server/hdmi/HdmiCecLocalDevicePlayback.java    | 94 +++++++++++++++++++++-
- .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 11 +++
- .../android/server/hdmi/HdmiCecMessageBuilder.java | 11 +++
- .../android/server/hdmi/HdmiControlService.java    | 15 +++-
- .../android/server/hdmi/RoutingControlAction.java  | 30 ++++++-
- 7 files changed, 217 insertions(+), 12 deletions(-)
+ .../android/server/hdmi/HdmiCecLocalDevice.java    | 58 +++++++++++++++++++++-
+ .../server/hdmi/HdmiCecLocalDevicePlayback.java    | 23 ++++++++-
+ .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 11 ++++
+ .../android/server/hdmi/HdmiControlService.java    | 15 ++++--
+ .../android/server/hdmi/RoutingControlAction.java  | 30 +++++++++--
+ 6 files changed, 127 insertions(+), 12 deletions(-)
  mode change 100755 => 100644 services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 
 diff --git a/services/core/java/com/android/server/audio/AudioService.java b/services/core/java/com/android/server/audio/AudioService.java
@@ -43,7 +42,7 @@ index 989b989..6f2b214 100644
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 old mode 100755
 new mode 100644
-index fbaafca..b94c0bb
+index fbaafca..5ae4dc2
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 @@ -35,7 +35,8 @@ import java.util.ArrayList;
@@ -56,18 +55,17 @@ index fbaafca..b94c0bb
  /**
   * Class that models a logical CEC device hosted in this system. Handles initialization,
   * CEC commands that call for actions customized per device type.
-@@ -45,6 +46,10 @@ abstract class HdmiCecLocalDevice {
+@@ -45,6 +46,9 @@ abstract class HdmiCecLocalDevice {
  
      private static final int MSG_DISABLE_DEVICE_TIMEOUT = 1;
      private static final int MSG_USER_CONTROL_RELEASE_TIMEOUT = 2;
-+    protected static final int MSG_GET_MENU_LANGUAGE_TIMEOUT = 3;
 +    protected static final int MSG_ACQUIRE_WAKE_LOCK = 4;
 +    protected static final int MSG_RELEASE_WAKE_LOCK = 5;
 +
      // Timeout in millisecond for device clean up (5s).
      // Normal actions timeout is 2s but some of them would have several sequence of timeout.
      private static final int DEVICE_CLEANUP_TIMEOUT = 5000;
-@@ -59,6 +64,7 @@ abstract class HdmiCecLocalDevice {
+@@ -59,6 +63,7 @@ abstract class HdmiCecLocalDevice {
      protected HdmiDeviceInfo mDeviceInfo;
      protected int mLastKeycode = HdmiCecKeycode.UNSUPPORTED_KEYCODE;
      protected int mLastKeyRepeatCount = 0;
@@ -75,7 +73,7 @@ index fbaafca..b94c0bb
  
      static class ActiveSource {
          int logicalAddress;
-@@ -129,7 +135,9 @@ abstract class HdmiCecLocalDevice {
+@@ -129,7 +134,9 @@ abstract class HdmiCecLocalDevice {
      // Note that access to this collection should happen in service thread.
      private final ArrayList<HdmiCecFeatureAction> mActions = new ArrayList<>();
  
@@ -86,13 +84,10 @@ index fbaafca..b94c0bb
          @Override
          public void handleMessage(Message msg) {
              switch (msg.what) {
-@@ -139,6 +147,15 @@ abstract class HdmiCecLocalDevice {
+@@ -139,6 +146,12 @@ abstract class HdmiCecLocalDevice {
                  case MSG_USER_CONTROL_RELEASE_TIMEOUT:
                      handleUserControlReleased();
                      break;
-+                case MSG_GET_MENU_LANGUAGE_TIMEOUT:
-+                    sendGetMenuLanguageCommand(Constants.ADDR_TV);
-+                    break;
 +                case MSG_ACQUIRE_WAKE_LOCK:
 +                    getWakeLock().acquire();
 +                    break;
@@ -102,18 +97,7 @@ index fbaafca..b94c0bb
              }
          }
      };
-@@ -582,6 +599,10 @@ abstract class HdmiCecLocalDevice {
-         // Do nothing.
-     }
- 
-+    protected void sendGetMenuLanguageCommand(int dest) {
-+        // Do nothing.
-+    }
-+
-     protected boolean handleSetOsdName(HdmiCecMessage message) {
-         // The default behavior of <Set Osd Name> is doing nothing.
-         return true;
-@@ -901,6 +922,7 @@ abstract class HdmiCecLocalDevice {
+@@ -901,6 +914,7 @@ abstract class HdmiCecLocalDevice {
      @ServiceThreadOnly
      protected void sendKeyEvent(int keyCode, boolean isPressed) {
          assertRunOnServiceThread();
@@ -121,7 +105,7 @@ index fbaafca..b94c0bb
          if (!HdmiCecKeycode.isSupportedKeycode(keyCode)) {
              Slog.w(TAG, "Unsupported key: " + keyCode);
              return;
-@@ -935,6 +957,46 @@ abstract class HdmiCecLocalDevice {
+@@ -935,6 +949,46 @@ abstract class HdmiCecLocalDevice {
          mService.sendCecCommand(HdmiCecMessageBuilder.buildUserControlReleased(
                  mAddress, targetAddress));
      }
@@ -169,7 +153,7 @@ index fbaafca..b94c0bb
      /**
       * Dump internal status of HdmiCecLocalDevice object.
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
-index d45b00b..af3feb9 100644
+index d45b00b..8617eab 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
 @@ -36,6 +36,8 @@ import java.util.List;
@@ -190,28 +174,7 @@ index d45b00b..af3feb9 100644
  
      private boolean mIsActiveSource = false;
  
-@@ -80,6 +82,8 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
-                 mAddress, mService.getPhysicalAddress(), mDeviceType));
-         mService.sendCecCommand(HdmiCecMessageBuilder.buildDeviceVendorIdCommand(
-                 mAddress, mService.getVendorId()));
-+        mHandler.sendMessageDelayed(
-+                Message.obtain(mHandler, MSG_GET_MENU_LANGUAGE_TIMEOUT), GET_MSG_TIMEOUT);
-         startQueuedActions();
-     }
- 
-@@ -159,6 +163,11 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
-         if (!connected) {
-             getWakeLock().release();
-         }
-+        if (connected) {
-+            mHandler.removeMessages(MSG_GET_MENU_LANGUAGE_TIMEOUT);
-+            mHandler.sendMessageDelayed(
-+                    Message.obtain(mHandler, MSG_GET_MENU_LANGUAGE_TIMEOUT), GET_MSG_TIMEOUT/2);
-+        }
-     }
- 
-     @Override
-@@ -269,6 +278,9 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+@@ -269,6 +271,9 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
          assertRunOnServiceThread();
          int newPath = HdmiUtils.twoBytesToInt(message.getParams(), 2);
          maySetActiveSource(newPath);
@@ -221,7 +184,7 @@ index d45b00b..af3feb9 100644
          return true;  // Broadcast message.
      }
  
-@@ -320,9 +332,19 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+@@ -320,9 +325,23 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
          if (!SET_MENU_LANGUAGE) {
              return false;
          }
@@ -230,8 +193,12 @@ index d45b00b..af3feb9 100644
              String iso3Language = new String(message.getParams(), 0, 3, "US-ASCII");
 +            HdmiLogger.debug("handleSetMenuLanguage, iso3Language: " + iso3Language);
 +            if (iso3Language.equals("chi") || iso3Language.equals("zho")) {
-+                HdmiCecLanguageHelp cecLanguage = new HdmiCecLanguageHelp(iso3Language);
-+                Locale locale = new Locale(cecLanguage.LanguageCode(), cecLanguage.CountryCode());
++                Locale locale = null;
++                if (iso3Language.equals("zho")) {
++                    locale = new Locale("zh", "CN"); //LanguageCode.CountryCode
++                } else {
++                    locale = new Locale("zh", "TW");
++                }
 +                try {
 +                    LocalePicker.updateLocale(locale);
 +                } catch (Exception e) {
@@ -242,88 +209,6 @@ index d45b00b..af3feb9 100644
              Locale currentLocale = mService.getContext().getResources().getConfiguration().locale;
              if (currentLocale.getISO3Language().equals(iso3Language)) {
                  // Do not switch language if the new language is the same as the current one.
-@@ -354,6 +376,14 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
-         }
-     }
- 
-+    protected void sendGetMenuLanguageCommand(int dest) {
-+        if (!SET_MENU_LANGUAGE) {
-+            return;
-+        }
-+        int targetAddress = Constants.ADDR_TV;
-+        mService.sendCecCommand(HdmiCecMessageBuilder.buildGetMenuLanguage(mAddress, targetAddress));
-+    }
-+
-     @Override
-     protected int findKeyReceiverAddress() {
-         return Constants.ADDR_TV;
-@@ -390,6 +420,66 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
-         pw.println("mAutoTvOff:" + mAutoTvOff);
-     }
- 
-+    class HdmiCecLanguageHelp {
-+        private final String [][] mCecLanguage = {
-+            {"chi", "zh", "TW"},
-+            {"zho", "zh", "CN"}
-+        };
-+
-+        private int mIndex;
-+
-+        HdmiCecLanguageHelp(String str) {
-+            int size;
-+            for (size = 0; size < mCecLanguage.length; size++) {
-+                if (mCecLanguage[size][0].equals(str)) {
-+                    mIndex = size;
-+                    break;
-+                }
-+            }
-+            if (size == mCecLanguage.length) {
-+                mIndex = -1;
-+            }
-+        }
-+
-+        public String LanguageCode() {
-+            if (mIndex != -1) {
-+                return mCecLanguage[mIndex][1];
-+            }
-+            return null;
-+        }
-+
-+        public String CountryCode() {
-+            if (mIndex != -1) {
-+                return mCecLanguage[mIndex][2];
-+            }
-+            return null;
-+        }
-+
-+        /*
-+         * get android language code for cec language code
-+         */
-+        public final String getCecLanguageCode(String cecLanguage) {
-+            int size;
-+            for (size = 0; size < mCecLanguage.length; size++) {
-+                if (mCecLanguage[size][0].equals(cecLanguage))
-+                    return mCecLanguage[size][1];
-+            }
-+            return null;
-+        }
-+
-+        /*
-+         * get android country code for cec language code
-+         */
-+        public final String getCecCountryCode(String cecLanguage) {
-+            int size;
-+            for (size = 0; size < mCecLanguage.length; size++) {
-+                if (mCecLanguage[size][0].equals(cecLanguage))
-+                    return mCecLanguage[size][2];
-+            }
-+            return null;
-+        }
-+    }
-+
-     // Wrapper interface over PowerManager.WakeLock
-     private interface ActiveWakeLock {
-         void acquire();
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 index 40d6df1..0b3438a4 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
@@ -374,28 +259,6 @@ index 40d6df1..0b3438a4 100644
      }
  
      boolean isProhibitMode() {
-diff --git a/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java b/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java
-index 9a51e3c..06ee301 100644
---- a/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java
-+++ b/services/core/java/com/android/server/hdmi/HdmiCecMessageBuilder.java
-@@ -440,6 +440,17 @@ public class HdmiCecMessageBuilder {
-     }
- 
-     /**
-+     * Build &lt;GetMenuLanguage&gt; command.
-+     *
-+     * @param src source address of command
-+     * @param dest destination address of command
-+     * @return newly created {@link HdmiCecMessage}
-+     */
-+    public static HdmiCecMessage buildGetMenuLanguage(int src, int dest) {
-+        return buildCommand(src, dest, Constants.MESSAGE_GET_MENU_LANGUAGE);
-+    }
-+
-+    /**
-      * Build &lt;Vendor Command&gt; command.
-      *
-      * @param src source address of command
 diff --git a/services/core/java/com/android/server/hdmi/HdmiControlService.java b/services/core/java/com/android/server/hdmi/HdmiControlService.java
 index dd8b7eb..12f08b7 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiControlService.java
