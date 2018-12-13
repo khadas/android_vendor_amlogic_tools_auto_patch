@@ -1,0 +1,144 @@
+From 35a422be74b79a1f06c546170d62a0934241d81e Mon Sep 17 00:00:00 2001
+From: yu fang <yu.fang@amlogic.com>
+Date: Tue, 18 Dec 2018 19:29:09 +0800
+Subject: [PATCH] TvSettings: Refresh the status of ethernet connections in
+ real time. [2/2]
+
+PD#SWPL-3219 PD#OTT-1166
+
+Problem:
+Didn't refresh UI when ethernet connections status changed.
+
+Solution:
+Refresh the status of ethernet connections in real time.
+
+Verify:
+verified on all platforms.
+
+Change-Id: Iad9e42d70db3bcaaf0348478d6d27862ebe190c3
+Signed-off-by: yu fang <yu.fang@amlogic.com>
+---
+ .../connectivity/ConnectivityListener.java         |  2 +-
+ .../tv/settings/connectivity/NetworkFragment.java  | 45 +++++++++++++++++++++-
+ 2 files changed, 45 insertions(+), 2 deletions(-)
+
+diff --git a/Settings/src/com/android/tv/settings/connectivity/ConnectivityListener.java b/Settings/src/com/android/tv/settings/connectivity/ConnectivityListener.java
+index 81147e8..9e9edd2 100644
+--- a/Settings/src/com/android/tv/settings/connectivity/ConnectivityListener.java
++++ b/Settings/src/com/android/tv/settings/connectivity/ConnectivityListener.java
+@@ -294,7 +294,7 @@ public class ConnectivityListener implements WifiTracker.WifiListener, Lifecycle
+         mWifiManager.setWifiEnabled(enable);
+     }
+
+-    private void updateConnectivityStatus() {
++    public void updateConnectivityStatus() {
+         NetworkInfo networkInfo = mConnectivityManager.getActiveNetworkInfo();
+         if (networkInfo == null) {
+             mNetworkType = ConnectivityManager.TYPE_NONE;
+diff --git a/Settings/src/com/android/tv/settings/connectivity/NetworkFragment.java b/Settings/src/com/android/tv/settings/connectivity/NetworkFragment.java
+index d367fdf..4e5d7d3 100644
+--- a/Settings/src/com/android/tv/settings/connectivity/NetworkFragment.java
++++ b/Settings/src/com/android/tv/settings/connectivity/NetworkFragment.java
+@@ -17,11 +17,16 @@
+ package com.android.tv.settings.connectivity;
+
+ import android.content.Context;
++import android.content.ContentResolver;
++import android.database.ContentObserver;
+ import android.net.wifi.WifiConfiguration;
++import android.net.Uri;
+ import android.os.Bundle;
+ import android.os.Handler;
++import android.os.Message;
+ import android.os.SystemClock;
+ import android.provider.Settings;
++import android.util.Log;
+ import android.support.v7.preference.Preference;
+ import android.support.v7.preference.PreferenceCategory;
+ import android.support.v7.preference.PreferenceManager;
+@@ -44,6 +49,8 @@ public class NetworkFragment extends SettingsPreferenceFragment implements
+         ConnectivityListener.Listener, ConnectivityListener.WifiNetworkListener,
+         AccessPoint.AccessPointListener {
+
++    private static final String TAG = "NetworkFragment";
++
+     private static final String KEY_WIFI_ENABLE = "wifi_enable";
+     private static final String KEY_WIFI_LIST = "wifi_list";
+     private static final String KEY_WIFI_COLLAPSE = "wifi_collapse";
+@@ -57,6 +64,10 @@ public class NetworkFragment extends SettingsPreferenceFragment implements
+
+     private static final int INITIAL_UPDATE_DELAY = 500;
+
++    private static final int MSG_NETWORK_CHANGE = 9;
++
++    public static final String NETWORK_STATUS = "network_status";
++
+     private ConnectivityListener mConnectivityListener;
+     private AccessPointPreference.UserBadgeCache mUserBadgeCache;
+
+@@ -69,8 +80,21 @@ public class NetworkFragment extends SettingsPreferenceFragment implements
+     private Preference mEthernetStatusPref;
+     private Preference mEthernetProxyPref;
+     private Preference mEthernetDhcpPref;
++    private ContentResolver mContentResolver;
++    private ContentObserver mNetworkObserver;
+
+-    private final Handler mHandler = new Handler();
++    private Handler mHandler = new Handler() {
++        @Override
++        public void handleMessage(Message msg) {
++            switch (msg.what) {
++                case MSG_NETWORK_CHANGE:
++                    Log.d(TAG, "MSG_NETWORK_CHANGE");
++                    mConnectivityListener.updateConnectivityStatus();
++                    updateConnectivity();
++                    break;
++            }
++        }
++    };
+     private long mNoWifiUpdateBeforeMillis;
+     private Runnable mInitialUpdateWifiListRunnable = new Runnable() {
+         @Override
+@@ -89,6 +113,16 @@ public class NetworkFragment extends SettingsPreferenceFragment implements
+         mConnectivityListener = new ConnectivityListener(getContext(), this, getLifecycle());
+         mUserBadgeCache =
+                 new AccessPointPreference.UserBadgeCache(getContext().getPackageManager());
++        mContentResolver = getContext().getContentResolver();
++        mNetworkObserver = new ContentObserver(mHandler) {
++            @Override
++            public void onChange(boolean selfChange, Uri uri) {
++                Log.d(TAG, "onChange uri = " + uri.toString());
++                if (!mHandler.hasMessages(MSG_NETWORK_CHANGE)) {
++                    mHandler.sendEmptyMessage(MSG_NETWORK_CHANGE);
++                }
++            }
++        };
+         super.onCreate(savedInstanceState);
+     }
+
+@@ -96,6 +130,7 @@ public class NetworkFragment extends SettingsPreferenceFragment implements
+     public void onStart() {
+         super.onStart();
+         mConnectivityListener.setWifiListener(this);
++        mContentResolver.registerContentObserver(Settings.System.getUriFor(NETWORK_STATUS), true, mNetworkObserver);
+         mNoWifiUpdateBeforeMillis = SystemClock.elapsedRealtime() + INITIAL_UPDATE_DELAY;
+         updateWifiList();
+     }
+@@ -109,6 +144,14 @@ public class NetworkFragment extends SettingsPreferenceFragment implements
+     }
+
+     @Override
++    public void onStop() {
++        super.onStop();
++        mHandler.removeCallbacksAndMessages(null);
++        mHandler = null;
++        mContentResolver.unregisterContentObserver(mNetworkObserver);
++    }
++
++    @Override
+     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+         getPreferenceManager().setPreferenceComparisonCallback(
+                 new PreferenceManager.SimplePreferenceComparisonCallback());
+--
+1.9.1
+
