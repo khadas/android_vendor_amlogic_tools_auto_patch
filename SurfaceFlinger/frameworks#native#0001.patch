@@ -1,4 +1,4 @@
-From e14f95c8f1a61341d980eb80ecabf718ec747962 Mon Sep 17 00:00:00 2001
+From b968c20fbbb8b325f085c4167bc8d5bc9b24b5d9 Mon Sep 17 00:00:00 2001
 From: sky zhou <sky.zhou@amlogic.com>
 Date: Thu, 16 Aug 2018 22:35:16 +0800
 Subject: [PATCH] surfaceflinger: add omx skip optimize.[3/3]
@@ -24,12 +24,12 @@ Change-Id: I45ae103586e12dbb94a154ac479a3d867ef91a57
 Signed-off-by: haiyuan xiong <haiyuan.xiong@amlogic.com>
 ---
  services/surfaceflinger/Android.bp              |   8 +
- services/surfaceflinger/BufferLayer.cpp         | 357 ++++++++++++++++++++++++
+ services/surfaceflinger/BufferLayer.cpp         | 356 ++++++++++++++++++++++++
  services/surfaceflinger/BufferLayer.h           |  21 ++
  services/surfaceflinger/BufferLayerConsumer.cpp | 111 ++++++++
  services/surfaceflinger/BufferLayerConsumer.h   |   7 +
  services/surfaceflinger/SurfaceFlinger.cpp      |   2 +-
- 6 files changed, 505 insertions(+), 1 deletion(-)
+ 6 files changed, 504 insertions(+), 1 deletion(-)
 
 diff --git a/services/surfaceflinger/Android.bp b/services/surfaceflinger/Android.bp
 index 320e11f..0564fa6 100644
@@ -58,10 +58,10 @@ index 320e11f..0564fa6 100644
      cppflags: [
          "-fwhole-program-vtables", // requires ThinLTO
 diff --git a/services/surfaceflinger/BufferLayer.cpp b/services/surfaceflinger/BufferLayer.cpp
-index 7ac1432..7d10d40 100644
+index 7ac1432..89080cc 100644
 --- a/services/surfaceflinger/BufferLayer.cpp
 +++ b/services/surfaceflinger/BufferLayer.cpp
-@@ -48,8 +48,213 @@
+@@ -48,8 +48,212 @@
  #include <stdlib.h>
  #include <mutex>
  
@@ -274,7 +274,7 @@ index 7ac1432..7d10d40 100644
  BufferLayer::BufferLayer(SurfaceFlinger* flinger, const sp<Client>& client, const String8& name,
                           uint32_t w, uint32_t h, uint32_t flags)
        : Layer(flinger, client, name, w, h, flags),
-@@ -60,6 +265,11 @@ BufferLayer::BufferLayer(SurfaceFlinger* flinger, const sp<Client>& client, cons
+@@ -60,6 +264,11 @@ BufferLayer::BufferLayer(SurfaceFlinger* flinger, const sp<Client>& client, cons
          mBufferLatched(false),
          mPreviousFrameNumber(0),
          mUpdateTexImageFailed(false),
@@ -286,7 +286,7 @@ index 7ac1432..7d10d40 100644
          mRefreshPending(false) {
      ALOGV("Creating Layer %s", name.string());
  
-@@ -75,6 +285,12 @@ BufferLayer::BufferLayer(SurfaceFlinger* flinger, const sp<Client>& client, cons
+@@ -75,6 +284,12 @@ BufferLayer::BufferLayer(SurfaceFlinger* flinger, const sp<Client>& client, cons
  }
  
  BufferLayer::~BufferLayer() {
@@ -299,7 +299,7 @@ index 7ac1432..7d10d40 100644
      mFlinger->deleteTextureAsync(mTextureName);
  
      if (!getBE().mHwcLayers.empty()) {
-@@ -399,6 +615,19 @@ Region BufferLayer::latchBuffer(bool& recomputeVisibleRegions, nsecs_t latchTime
+@@ -399,6 +614,19 @@ Region BufferLayer::latchBuffer(bool& recomputeVisibleRegions, nsecs_t latchTime
          return outDirtyRegion;
      }
  
@@ -319,7 +319,7 @@ index 7ac1432..7d10d40 100644
      // if we've already called updateTexImage() without going through
      // a composition step, we have to skip this layer at this point
      // because we cannot call updateTeximage() without a corresponding
-@@ -487,6 +716,17 @@ Region BufferLayer::latchBuffer(bool& recomputeVisibleRegions, nsecs_t latchTime
+@@ -487,6 +715,17 @@ Region BufferLayer::latchBuffer(bool& recomputeVisibleRegions, nsecs_t latchTime
              android_atomic_dec(&mQueuedFrames);
          }
  
@@ -337,7 +337,7 @@ index 7ac1432..7d10d40 100644
          const std::string layerName(getName().c_str());
          mTimeStats.setAcquireFence(layerName, currentFrameNumber, mQueueItems[0].mFenceTime);
          mTimeStats.setLatchTime(layerName, currentFrameNumber, latchTime);
-@@ -724,6 +964,9 @@ void BufferLayer::onFirstRef() {
+@@ -724,6 +963,9 @@ void BufferLayer::onFirstRef() {
  
      const sp<const DisplayDevice> hw(mFlinger->getDefaultDisplayDevice());
      updateTransformHint(hw);
@@ -347,7 +347,7 @@ index 7ac1432..7d10d40 100644
  }
  
  // ---------------------------------------------------------------------------
-@@ -751,6 +994,10 @@ void BufferLayer::onFrameAvailable(const BufferItem& item) {
+@@ -751,6 +993,10 @@ void BufferLayer::onFrameAvailable(const BufferItem& item) {
                  ALOGE("[%s] Timed out waiting on callback", mName.string());
              }
          }
@@ -358,7 +358,7 @@ index 7ac1432..7d10d40 100644
  
          mQueueItems.push_back(item);
          android_atomic_inc(&mQueuedFrames);
-@@ -759,6 +1006,11 @@ void BufferLayer::onFrameAvailable(const BufferItem& item) {
+@@ -759,6 +1005,11 @@ void BufferLayer::onFrameAvailable(const BufferItem& item) {
          mLastFrameNumberReceived = item.mFrameNumber;
          mQueueItemCondition.broadcast();
      }
@@ -370,7 +370,7 @@ index 7ac1432..7d10d40 100644
  
      mFlinger->signalLayerUpdate();
  }
-@@ -1001,6 +1253,111 @@ bool BufferLayer::allTransactionsSignaled() {
+@@ -1001,6 +1252,111 @@ bool BufferLayer::allTransactionsSignaled() {
      return !matchingFramesFound || allTransactionsApplied;
  }
  
