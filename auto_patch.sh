@@ -37,7 +37,7 @@ function auto_patch()
                     if [ $? != 0 ]
                     then
                         git am --abort
-                        echo "failed,maybe already patched    "
+                        echo "### patch_dir ${patch_dir##*/} failed,maybe already patched    "
                         return 1
                     fi
                 #else
