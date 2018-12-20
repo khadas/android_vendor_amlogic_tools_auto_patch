@@ -16,7 +16,7 @@
 function auto_patch()
 {
     local patch_dir=$1
-    echo "###patch_dir ${patch_dir##*/} "
+    #echo "###patch_dir ${patch_dir##*/} "
 
     for file in $patch_dir/*
     do
