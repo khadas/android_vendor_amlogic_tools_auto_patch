@@ -1,4 +1,4 @@
-From 498b3b336c50d300c1fe7b56d894613d4ed428f8 Mon Sep 17 00:00:00 2001
+From 08946c74d6333ba0cdb3ed3920525321cc9b0723 Mon Sep 17 00:00:00 2001
 From: Chaomin Zheng <chaomin.zheng@amlogic.com>
 Date: Sat, 15 Dec 2018 16:45:35 +0800
 Subject: [PATCH] TvInputHardawreManager: use listAudioPorts replace
@@ -18,14 +18,77 @@ verify by p321
 Change-Id: I1e7b619eb0f5fa1cc985fab5fd17459c1bc16701
 Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
 ---
- .../android/server/tv/TvInputHardwareManager.java  | 48 ++++++++++++++--------
- 1 file changed, 31 insertions(+), 17 deletions(-)
+ .../android/server/tv/TvInputHardwareManager.java  | 97 ++++++++++++++++++----
+ 1 file changed, 80 insertions(+), 17 deletions(-)
 
 diff --git a/services/core/java/com/android/server/tv/TvInputHardwareManager.java b/services/core/java/com/android/server/tv/TvInputHardwareManager.java
-index 17a3bd8..99995d0 100644
+index c4c9da7..0b0a2fb 100644
 --- a/services/core/java/com/android/server/tv/TvInputHardwareManager.java
 +++ b/services/core/java/com/android/server/tv/TvInputHardwareManager.java
-@@ -793,15 +793,20 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -32,6 +32,11 @@ import android.hardware.hdmi.IHdmiControlService;
+ import android.hardware.hdmi.IHdmiDeviceEventListener;
+ import android.hardware.hdmi.IHdmiHotplugEventListener;
+ import android.hardware.hdmi.IHdmiSystemAudioModeChangeListener;
++import android.hardware.usb.UsbConfiguration;
++import android.hardware.usb.UsbConstants;
++import android.hardware.usb.UsbDevice;
++import android.hardware.usb.UsbInterface;
++import android.hardware.usb.UsbManager;
+ import android.media.AudioDevicePort;
+ import android.media.AudioFormat;
+ import android.media.AudioGain;
+@@ -148,6 +153,50 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+             filter.addAction(AudioManager.STREAM_MUTE_CHANGED_ACTION);
+             mContext.registerReceiver(mVolumeReceiver, filter);
+             updateVolume();
++
++            BroadcastReceiver hostReceiver = new BroadcastReceiver() {
++                @Override
++                public void onReceive(Context context, Intent intent) {
++                    boolean hasUsbAudioDevice = false;
++                    UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
++                    if (device == null) {
++                        return;
++                    }
++                    int count = device.getConfigurationCount();
++                    for (int i = 0; i < count; i++) {
++                        UsbConfiguration configuration = device.getConfiguration(i);
++                        if (configuration == null) {
++                            return;
++                        }
++                        int interfaceCount = configuration.getInterfaceCount();
++                        for (int j = 0; j < interfaceCount; j++) {
++                            UsbInterface usbInterface = configuration.getInterface(j);
++                            if (usbInterface != null &&
++                                    usbInterface.getInterfaceClass() == UsbConstants.USB_CLASS_AUDIO) {
++                                hasUsbAudioDevice = true;
++                            }
++                        }
++                    }
++                    if (hasUsbAudioDevice) {
++                        mHandler.postDelayed(new Runnable() {
++                            public void run() {
++                                synchronized (mLock) {
++                                    for (int i = 0; i < mConnections.size(); ++i) {
++                                        TvInputHardwareImpl impl = mConnections.valueAt(i).getHardwareImplLocked();
++                                        if (impl != null) {
++                                            impl.handleAudioSinkUpdated();
++                                        }
++                                    }
++                                }
++                            }
++                        }, UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(intent.getAction()) ? 0 : 1200);
++                    }
++                }
++            };
++            final IntentFilter usbFilter =
++                    new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED);
++            usbFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
++            mContext.registerReceiver(hostReceiver, usbFilter);
+         }
+     }
+ 
+@@ -790,15 +839,20 @@ class TvInputHardwareManager implements TvInputHal.Callback {
  
          private void findAudioSinkFromAudioPolicy(List<AudioDevicePort> sinks) {
              sinks.clear();
@@ -52,7 +115,7 @@ index 17a3bd8..99995d0 100644
                  }
              }
          }
-@@ -810,13 +815,18 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -807,13 +861,18 @@ class TvInputHardwareManager implements TvInputHal.Callback {
              if (type == AudioManager.DEVICE_NONE) {
                  return null;
              }
@@ -76,7 +139,7 @@ index 17a3bd8..99995d0 100644
                  }
              }
              return null;
-@@ -1296,14 +1306,18 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -1293,14 +1352,18 @@ class TvInputHardwareManager implements TvInputHal.Callback {
          IHdmiSystemAudioModeChangeListener.Stub {
          @Override
          public void onStatusChanged(boolean enabled) throws RemoteException {
