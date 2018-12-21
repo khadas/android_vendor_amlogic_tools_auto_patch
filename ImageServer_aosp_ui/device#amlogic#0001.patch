@@ -1,6 +1,6 @@
-From eecbd826b7cd61ac4bd6363f160cb66a5cde07a0 Mon Sep 17 00:00:00 2001
+From 2ac636f2bea739d49aba70fb512ab982f8cc7263 Mon Sep 17 00:00:00 2001
 From: Lei Qian <lei.qian@amlogic.com>
-Date: Wed, 19 Dec 2018 21:02:29 +0800
+Date: Fri, 21 Dec 2018 21:00:26 +0800
 Subject: [PATCH] imageserver:remove imageserver to aosp only [2/2]
 
 PD#SWPL-2263
@@ -14,24 +14,24 @@ remove imageserver to aosp only
 Verify:
 Verify on Ampere
 
-Change-Id: I071eeaca158f752c213f3e2cc13669f82e9f6a2a
+Change-Id: I5dd020600c298feec6ae8827a2e9caa2ef20fbdd
 Signed-off-by: Lei Qian <lei.qian@amlogic.com>
 ---
- ampere/manifest.xml          | 9 +++++++++
- braun/manifest.xml           | 9 +++++++++
- curie/manifest.xml           | 9 +++++++++
- darwin/manifest.xml          | 9 +++++++++
- einstein/manifest.xml        | 9 +++++++++
- franklin/manifest.xml        | 9 +++++++++
- galilei/manifest.xml         | 9 +++++++++
- hertz/manifest.xml           | 9 +++++++++
- t962_p321/manifest.xml       | 9 +++++++++
- t962_p321_1080p/manifest.xml | 9 +++++++++
- t962x2_skt/manifest.xml      | 9 +++++++++
- t962x2_x301/manifest.xml     | 9 +++++++++
- t962x_r314/manifest.xml      | 9 +++++++++
- u200/manifest.xml            | 9 +++++++++
- u221/manifest.xml            | 9 +++++++++
+ ampere/manifest.xml     | 9 +++++++++
+ braun/manifest.xml      | 9 +++++++++
+ curie/manifest.xml      | 9 +++++++++
+ darwin/manifest.xml     | 9 +++++++++
+ einstein/manifest.xml   | 9 +++++++++
+ franklin/manifest.xml   | 9 +++++++++
+ galilei/manifest.xml    | 9 +++++++++
+ hertz/manifest.xml      | 9 +++++++++
+ lyell/manifest.xml      | 9 +++++++++
+ marconi/manifest.xml    | 9 +++++++++
+ t962_p321/manifest.xml  | 9 +++++++++
+ t962x2_skt/manifest.xml | 9 +++++++++
+ t962x_r314/manifest.xml | 9 +++++++++
+ u200/manifest.xml       | 9 +++++++++
+ u221/manifest.xml       | 9 +++++++++
  15 files changed, 135 insertions(+)
 
 diff --git a/ampere/manifest.xml b/ampere/manifest.xml
@@ -92,7 +92,7 @@ index c7a17a7..8e5f13f 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/darwin/manifest.xml b/darwin/manifest.xml
-index 9c55127..9fa0e82 100644
+index dfce1b6..d4f9cfa 100644
 --- a/darwin/manifest.xml
 +++ b/darwin/manifest.xml
 @@ -1,5 +1,14 @@
@@ -111,7 +111,7 @@ index 9c55127..9fa0e82 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/einstein/manifest.xml b/einstein/manifest.xml
-index b95ab30..71f219d 100644
+index e070fd5..9c7c278 100644
 --- a/einstein/manifest.xml
 +++ b/einstein/manifest.xml
 @@ -1,5 +1,14 @@
@@ -186,8 +186,46 @@ index f77fac1..f982d11 100644
          <name>android.hardware.configstore</name>
          <transport>hwbinder</transport>
          <version>1.0</version>
+diff --git a/lyell/manifest.xml b/lyell/manifest.xml
+index e070fd5..9c7c278 100644
+--- a/lyell/manifest.xml
++++ b/lyell/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/marconi/manifest.xml b/marconi/manifest.xml
+index dfce1b6..d4f9cfa 100644
+--- a/marconi/manifest.xml
++++ b/marconi/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
 diff --git a/t962_p321/manifest.xml b/t962_p321/manifest.xml
-index b95ab30..71f219d 100644
+index e070fd5..9c7c278 100644
 --- a/t962_p321/manifest.xml
 +++ b/t962_p321/manifest.xml
 @@ -1,5 +1,14 @@
@@ -205,27 +243,8 @@ index b95ab30..71f219d 100644
          <name>android.hardware.configstore</name>
          <transport>hwbinder</transport>
          <version>1.1</version>
-diff --git a/t962_p321_1080p/manifest.xml b/t962_p321_1080p/manifest.xml
-index b95ab30..71f219d 100644
---- a/t962_p321_1080p/manifest.xml
-+++ b/t962_p321_1080p/manifest.xml
-@@ -1,5 +1,14 @@
- <manifest version="1.0" type="device" target-level="3">
-     <hal format="hidl">
-+        <name>vendor.amlogic.hardware.imageserver</name>
-+        <transport>hwbinder</transport>
-+        <version>1.0</version>
-+        <interface>
-+            <name>IImageService</name>
-+            <instance>default</instance>
-+        </interface>
-+    </hal>
-+    <hal format="hidl">
-         <name>android.hardware.configstore</name>
-         <transport>hwbinder</transport>
-         <version>1.1</version>
 diff --git a/t962x2_skt/manifest.xml b/t962x2_skt/manifest.xml
-index 9c55127..9fa0e82 100644
+index dfce1b6..d4f9cfa 100644
 --- a/t962x2_skt/manifest.xml
 +++ b/t962x2_skt/manifest.xml
 @@ -1,5 +1,14 @@
@@ -243,27 +262,8 @@ index 9c55127..9fa0e82 100644
          <name>android.hardware.configstore</name>
          <transport>hwbinder</transport>
          <version>1.1</version>
-diff --git a/t962x2_x301/manifest.xml b/t962x2_x301/manifest.xml
-index 9c55127..9fa0e82 100644
---- a/t962x2_x301/manifest.xml
-+++ b/t962x2_x301/manifest.xml
-@@ -1,5 +1,14 @@
- <manifest version="1.0" type="device" target-level="3">
-     <hal format="hidl">
-+        <name>vendor.amlogic.hardware.imageserver</name>
-+        <transport>hwbinder</transport>
-+        <version>1.0</version>
-+        <interface>
-+            <name>IImageService</name>
-+            <instance>default</instance>
-+        </interface>
-+    </hal>
-+    <hal format="hidl">
-         <name>android.hardware.configstore</name>
-         <transport>hwbinder</transport>
-         <version>1.1</version>
 diff --git a/t962x_r314/manifest.xml b/t962x_r314/manifest.xml
-index b95ab30..71f219d 100644
+index e070fd5..9c7c278 100644
 --- a/t962x_r314/manifest.xml
 +++ b/t962x_r314/manifest.xml
 @@ -1,5 +1,14 @@
