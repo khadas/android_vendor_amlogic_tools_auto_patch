@@ -1,6 +1,6 @@
-From 7d81b1e759faf3fa68d6fb792fb59135b4461bde Mon Sep 17 00:00:00 2001
-From: Chaomin Zheng <chaomin.zheng@amlogic.com>
-Date: Sat, 29 Sep 2018 15:24:48 +0800
+From af2cc9ecc772e7fe2563c965e79789e936f4ad0e Mon Sep 17 00:00:00 2001
+From: Lei Qian <lei.qian@amlogic.com>
+Date: Fri, 30 Nov 2018 22:40:21 +0800
 Subject: [PATCH] Audiopolicy:adjust spdif hdmi_arc policy[1/4]
 
 PD# 315
@@ -9,11 +9,11 @@ adjust spdif hdmi_arc policy
 
 Change-Id: I5117e4376e0e3eab1298a00758ac765993812af3
 ---
- services/audiopolicy/Android.mk                    |  6 +++--
- services/audiopolicy/common/include/Volume.h       |  8 ++++++-
- services/audiopolicy/enginedefault/src/Engine.cpp  | 28 ++++++++++++++++++++--
- .../managerdefault/AudioPolicyManager.cpp          | 25 +++++++++++++------
- 4 files changed, 55 insertions(+), 12 deletions(-)
+ services/audiopolicy/Android.mk                    |  6 ++--
+ services/audiopolicy/common/include/Volume.h       |  8 ++++-
+ services/audiopolicy/enginedefault/src/Engine.cpp  | 28 +++++++++++++++--
+ .../managerdefault/AudioPolicyManager.cpp          | 36 +++++++++++++++++-----
+ 4 files changed, 66 insertions(+), 12 deletions(-)
 
 diff --git a/services/audiopolicy/Android.mk b/services/audiopolicy/Android.mk
 index d29cae1..7599549 100644
@@ -122,7 +122,7 @@ index 3e13e50..ba5a9ca 100644
  
          // for STRATEGY_SONIFICATION:
 diff --git a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
-index f1e4c55..a71312a 100644
+index 1d22064..a71312a 100644
 --- a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
 +++ b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
 @@ -38,6 +38,7 @@
@@ -165,7 +165,7 @@ index f1e4c55..a71312a 100644
  
      // Once policy config has been parsed, retrieve an instance of the engine and initialize it.
      audio_policy::EngineInstance *engineInstance = audio_policy::EngineInstance::getInstance();
-@@ -5649,15 +5659,16 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
+@@ -5649,18 +5659,30 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
      }
  
      if (mIsPlatformTelevision) {
@@ -186,12 +186,18 @@ index f1e4c55..a71312a 100644
 +            int volumeIndex = mVolumeCurves->getVolumeIndex(AUDIO_STREAM_MUSIC, curDevice);
              int volumeMaxIndex = mVolumeCurves->getVolumeIndexMax(AUDIO_STREAM_MUSIC);
              float mediaVolume = (float) volumeIndex / (float) volumeMaxIndex;
- 
-@@ -5671,7 +5682,7 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
-                    mediaVolume = 0.25f;
-                 }
-             }
 -            outputDesc->updateGain(stream, device, mediaVolume);
++
++            if (volumeMaxIndex == 1) {
++                char defaultMediaVolume[PROPERTY_VALUE_MAX];
++                char volumeStep[PROPERTY_VALUE_MAX];
++                if (property_get("ro.config.media_vol_default", defaultMediaVolume, NULL)
++                        && property_get("ro.config.media_vol_steps", volumeStep, NULL)) {
++                   mediaVolume = ((float)atoi(defaultMediaVolume)) / ((float)atoi(volumeStep));
++                } else {
++                   mediaVolume = 0.25f;
++                }
++            }
 +            outputDesc->updateGain(stream, curDevice, mediaVolume);
          }
      }
