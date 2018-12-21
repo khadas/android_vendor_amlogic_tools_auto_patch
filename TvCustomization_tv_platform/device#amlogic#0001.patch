@@ -1,0 +1,98 @@
+From 21ce3be8c96c2ed5fb70c4ba92c7f8b994936150 Mon Sep 17 00:00:00 2001
+From: Cheng Tong <cheng.tong@amlogic.com>
+Date: Fri, 21 Dec 2018 19:32:41 +0800
+Subject: [PATCH] franklin: Cannot enter the system [2/2]
+
+PD#SWPL-3441
+
+Problem:
+android.hardware.tv.input can't work
+
+Solution:
+add android.hardware.tv.input when livetv open
+
+Verify:
+Verify by Android P franklin
+
+Change-Id: Ib1dfc911764eba7100ffa57c05392eee89992612
+Signed-off-by: Cheng Tong <cheng.tong@amlogic.com>
+---
+ braun/manifest.xml    | 18 ++++++++++++++++++
+ franklin/manifest.xml | 18 ++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+
+diff --git a/braun/manifest.xml b/braun/manifest.xml
+index 10cc8b3..5143435 100644
+--- a/braun/manifest.xml
++++ b/braun/manifest.xml
+@@ -174,6 +174,15 @@
+         </interface>
+     </hal>
+     <hal>
++        <name>android.hardware.tv.input</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ITvInput</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal>
+         <name>vendor.amlogic.hardware.systemcontrol</name>
+         <transport>hwbinder</transport>
+         <version>1.0</version>
+@@ -183,6 +192,15 @@
+         </interface>
+     </hal>
+     <hal>
++        <name>vendor.amlogic.hardware.tvserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ITvServer</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal>
+         <name>vendor.amlogic.hardware.hdmicec</name>
+         <transport>hwbinder</transport>
+         <version>1.0</version>
+diff --git a/franklin/manifest.xml b/franklin/manifest.xml
+index b3b151c..f60bce7 100644
+--- a/franklin/manifest.xml
++++ b/franklin/manifest.xml
+@@ -194,6 +194,15 @@
+         </interface>
+     </hal>
+     <hal>
++        <name>android.hardware.tv.input</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ITvInput</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal>
+         <name>vendor.amlogic.hardware.systemcontrol</name>
+         <transport>hwbinder</transport>
+         <version>1.0</version>
+@@ -203,6 +212,15 @@
+         </interface>
+     </hal>
+     <hal>
++        <name>vendor.amlogic.hardware.tvserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ITvServer</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal>
+         <name>vendor.amlogic.hardware.hdmicec</name>
+         <transport>hwbinder</transport>
+         <version>1.0</version>
+-- 
+1.9.1
+
