@@ -1,4 +1,4 @@
-From e70d1802f3ab66ebd1b3c8dc4055a1aad0efeeb1 Mon Sep 17 00:00:00 2001
+From bced02e2474f3b4db865125fbba0034163b66c8f Mon Sep 17 00:00:00 2001
 From: Chaomin Zheng <chaomin.zheng@amlogic.com>
 Date: Wed, 14 Nov 2018 18:32:43 +0800
 Subject: [PATCH] Arc: update arc format when update audio device status [1/3]
@@ -23,7 +23,7 @@ Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
  3 files changed, 119 insertions(+), 22 deletions(-)
 
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-index 928cdbb..2aaf73b 100644
+index 928cdbb..fbbc44c 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 @@ -81,6 +81,8 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
@@ -110,7 +110,7 @@ index 928cdbb..2aaf73b 100644
 +            enableSystemAudio = false;
 +        }
 +        HdmiCecMessage command = HdmiCecMessageBuilder.buildSystemAudioModeRequest(
-+                mAddress, getAvrDeviceInfo().getLogicalAddress(),
++                mAddress, Constants.ADDR_AUDIO_SYSTEM,
 +                enableSystemAudio ? getAvrDeviceInfo().getPhysicalAddress() : mAddress, enableSystemAudio);
 +        mService.sendCecCommand(command, new HdmiControlService.SendMessageCallback() {
 +            @Override
