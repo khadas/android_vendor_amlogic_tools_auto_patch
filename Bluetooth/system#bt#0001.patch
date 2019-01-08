@@ -1,19 +1,74 @@
-From 1a6888afa1d48a502d4b89b2121b27932f543fe3 Mon Sep 17 00:00:00 2001
-From: "qiu.zeng" <qiu.zeng@amlogic.com>
-Date: Mon, 7 Jan 2019 13:24:09 +0800
-Subject: [PATCH] BT: Fixed Google Quick Logon Update apk First Unable to
- Record [1/1]
+From bbeb98d03409fc194e9e2f605b4c481849327fea Mon Sep 17 00:00:00 2001
+From: Kuibao Zhang <kuibao.zhang@amlogic.com>
+Date: Wed, 9 Jan 2019 21:29:10 +0800
+Subject: [PATCH] BT/WIFI: bt&wifi coexistence [1/2]
 
-Change-Id: I3720fda47025b6a00d0def18be42ba509db8e13f
+PD#SWPL-3628
+
+Problem:
+    WIFI throughput test value too low while connect WIFI
+    2.4G & BT rc
+
+Solution:
+    change bt stack.
+
+Verify:
+    ampere.
+
+Change-Id: Iaafba624223881a08b10ff5bbb43c7147c8b6f44
 ---
- stack/gatt/gatt_api.cc | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
- mode change 100644 => 100755 stack/gatt/gatt_api.cc
+ internal_include/bt_target.h | 11 +++++++++++
+ stack/btm/btm_ble.cc         |  3 +++
+ stack/gatt/gatt_api.cc       |  2 +-
+ stack/hcic/hciblecmds.cc     | 21 +++++++++++++++++++++
+ stack/include/hcidefs.h      |  4 ++++
+ stack/include/hcimsgs.h      |  8 ++++++++
+ 6 files changed, 48 insertions(+), 1 deletion(-)
+ mode change 100644 => 100755 stack/btm/btm_ble.cc
+ mode change 100644 => 100755 stack/hcic/hciblecmds.cc
+ mode change 100644 => 100755 stack/include/hcidefs.h
+ mode change 100644 => 100755 stack/include/hcimsgs.h
 
-diff --git a/stack/gatt/gatt_api.cc b/stack/gatt/gatt_api.cc
+diff --git a/internal_include/bt_target.h b/internal_include/bt_target.h
+index cf09b15..9d11f79 100644
+--- a/internal_include/bt_target.h
++++ b/internal_include/bt_target.h
+@@ -1384,6 +1384,17 @@ single PDU.
+ #define BTSNOOP_MEM TRUE
+ #endif
+ 
++/******************************************************************************
++ *
++ * Patch: auto patch macro
++ *
++ *****************************************************************************/
++/* wifi/bt coexistence.bug:SWPL-3628 */
++#ifndef MASTER_LATENCY
++#define MASTER_LATENCY TRUE
++#endif
++
++
+ #include "bt_trace.h"
+ 
+ #endif /* BT_TARGET_H */
+diff --git a/stack/btm/btm_ble.cc b/stack/btm/btm_ble.cc
 old mode 100644
 new mode 100755
-index b983318..534dc77
+index ca93e1a..1c41d4e
+--- a/stack/btm/btm_ble.cc
++++ b/stack/btm/btm_ble.cc
+@@ -1946,6 +1946,9 @@ void btm_ble_conn_complete(uint8_t* p, UNUSED_ATTR uint16_t evt_len,
+     STREAM_TO_UINT16(conn_latency, p);
+     STREAM_TO_UINT16(conn_timeout, p);
+     handle = HCID_GET_HANDLE(handle);
++#if (MASTER_LATENCY == TRUE)
++	btsnd_hcic_write_le_master_latency(handle,0x05,0xF);
++#endif
+ 
+ #if (BLE_PRIVACY_SPT == TRUE)
+     peer_addr_type = bda_type;
+diff --git a/stack/gatt/gatt_api.cc b/stack/gatt/gatt_api.cc
+index b983318..1899276 100644
 --- a/stack/gatt/gatt_api.cc
 +++ b/stack/gatt/gatt_api.cc
 @@ -451,7 +451,7 @@ tGATT_STATUS GATTS_HandleValueIndication(uint16_t conn_id, uint16_t attr_handle,
@@ -21,10 +76,94 @@ index b983318..534dc77
        if (cmd_status == GATT_SUCCESS || cmd_status == GATT_CONGESTED) {
          p_tcb->indicate_handle = indication.handle;
 -        gatt_start_conf_timer(p_tcb);
-+        //gatt_start_conf_timer(p_tcb);
++       // gatt_start_conf_timer(p_tcb);
        }
      }
    }
+diff --git a/stack/hcic/hciblecmds.cc b/stack/hcic/hciblecmds.cc
+old mode 100644
+new mode 100755
+index 30d8d75..9696eb8
+--- a/stack/hcic/hciblecmds.cc
++++ b/stack/hcic/hciblecmds.cc
+@@ -28,11 +28,32 @@
+ #include "btu.h"
+ #include "hcidefs.h"
+ #include "hcimsgs.h"
++#if (MASTER_LATENCY == TRUE)
++#include "btm_api.h"
++#endif
+ 
+ #include <base/bind.h>
+ #include <stddef.h>
+ #include <string.h>
+ 
++#if (MASTER_LATENCY == TRUE)
++uint8_t btsnd_hcic_write_le_master_latency(uint16_t handle,uint16_t master_latency, uint16_t master_latency_timeout){
++
++    uint8_t               *pp;
++    uint8_t             command[HCIC_PARAM_SIZE_WRITE_LE_MASTER_LATENCY];
++    pp = command;
++
++    UINT16_TO_STREAM (pp, handle);
++
++    UINT16_TO_STREAM (pp, master_latency);
++    UINT16_TO_STREAM (pp, master_latency_timeout);
++
++    BTM_VendorSpecificCommand (HCI_BLE_WRITE_LE_MASTER_LATENCY, HCIC_PARAM_SIZE_WRITE_LE_MASTER_LATENCY, command, NULL);
++
++    return (TRUE);
++}
++#endif
++
+ void btsnd_hcic_ble_set_local_used_feat(uint8_t feat_set[8]) {
+   BT_HDR* p = (BT_HDR*)osi_malloc(HCI_CMD_BUF_SIZE);
+   uint8_t* pp = (uint8_t*)(p + 1);
+diff --git a/stack/include/hcidefs.h b/stack/include/hcidefs.h
+old mode 100644
+new mode 100755
+index db58163..01de06e
+--- a/stack/include/hcidefs.h
++++ b/stack/include/hcidefs.h
+@@ -414,6 +414,10 @@
+ /* Energy info OCF */
+ #define HCI_BLE_ENERGY_INFO_OCF (0x0159 | HCI_GRP_VENDOR_SPECIFIC)
+ 
++#if (MASTER_LATENCY == TRUE)
++#define HCI_BLE_WRITE_LE_MASTER_LATENCY (0x01C7 | HCI_GRP_VENDOR_SPECIFIC)
++#endif
++
+ /* Extended BLE Scan parameters OCF */
+ #define HCI_BLE_EXTENDED_SCAN_PARAMS_OCF (0x015A | HCI_GRP_VENDOR_SPECIFIC)
+ 
+diff --git a/stack/include/hcimsgs.h b/stack/include/hcimsgs.h
+old mode 100644
+new mode 100755
+index a909751..e657d0e
+--- a/stack/include/hcimsgs.h
++++ b/stack/include/hcimsgs.h
+@@ -688,6 +688,9 @@ extern void btsnd_hcic_vendor_spec_cmd(void* buffer, uint16_t opcode,
+ #define HCIC_PARAM_SIZE_BLE_READ_REMOTE_FEAT 2
+ #define HCIC_PARAM_SIZE_BLE_ENCRYPT 32
+ #define HCIC_PARAM_SIZE_WRITE_LE_HOST_SUPPORTED 2
++#if (MASTER_LATENCY == TRUE)
++#define HCIC_PARAM_SIZE_WRITE_LE_MASTER_LATENCY 6
++#endif
+ 
+ #define HCIC_BLE_RAND_DI_SIZE 8
+ #define HCIC_BLE_ENCRYT_KEY_SIZE 16
+@@ -767,6 +770,11 @@ extern void btsnd_hcic_ble_add_white_list(uint8_t addr_type,
+ extern void btsnd_hcic_ble_remove_from_white_list(uint8_t addr_type,
+                                                   const RawAddress& bda);
+ 
++#if (MASTER_LATENCY == TRUE)
++extern uint8_t btsnd_hcic_write_le_master_latency(uint16_t handle,uint16_t master_latency,
++		uint16_t master_latency_timeout);
++#endif
++
+ extern void btsnd_hcic_ble_upd_ll_conn_params(
+     uint16_t handle, uint16_t conn_int_min, uint16_t conn_int_max,
+     uint16_t conn_latency, uint16_t conn_timeout, uint16_t min_len,
 -- 
 1.9.1
 
