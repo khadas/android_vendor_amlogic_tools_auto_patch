@@ -1,0 +1,210 @@
+From 9690410c330c89025c69a3dc76cb1dda84f3fca6 Mon Sep 17 00:00:00 2001
+From: Zhigang <zhigang.yu@amlogic.com>
+Date: Thu, 10 Jan 2019 14:52:59 +0800
+Subject: [PATCH] recovery: add update from backup package [1/3]
+
+PD#TV-2110
+
+add update from backup package recovery from mmcblk0
+
+Change-Id: Icfa463e2e26adfc85febb5cae7fdc9b2bce173c6
+---
+ etc/init.rc |   2 ++
+ install.cpp | 108 +++++++++++++++++++++++++++++++++++++++++++++---------------
+ 2 files changed, 84 insertions(+), 26 deletions(-)
+
+diff --git a/etc/init.rc b/etc/init.rc
+index 0fc6c4c..434f618 100644
+--- a/etc/init.rc
++++ b/etc/init.rc
+@@ -27,6 +27,8 @@ on init
+     chown root shell /tmp
+     chmod 0775 /tmp
+ 
++    write /proc/sys/vm/watermark_scale_factor 30
++    write /proc/sys/vm/min_free_kbytes 12288
+     write /proc/sys/kernel/panic_on_oops 1
+     write /proc/sys/vm/max_map_count 1000000
+ 
+diff --git a/install.cpp b/install.cpp
+index 1d2fcee..9bbaa5f 100644
+--- a/install.cpp
++++ b/install.cpp
+@@ -48,6 +48,7 @@
+ #include <vintf/VintfObjectRecovery.h>
+ #include <ziparchive/zip_archive.h>
+ 
++#include "bootloader.h"
+ #include "common.h"
+ #include "otautil/SysUtil.h"
+ #include "otautil/ThermalUtil.h"
+@@ -607,8 +608,8 @@ int try_recovery_by_zipinfo() {
+     //update.zip stored offset offset
+     lseek(fd, offset*1024*1024, SEEK_SET);
+ 
+-    //open update.zip
+-    pf = fopen(filename, "w+");
++    //open /data/update.zip
++    pf = fopen("/data/update.zip", "w+");
+     if (pf == NULL) {
+ 	printf("fopen %s failed!\n", filename);
+ 	close(fd);
+@@ -640,25 +641,49 @@ int try_recovery_by_zipinfo() {
+     close(fd);
+     fflush(pf);
+     fclose(pf);
+-    unlink(CACHE_ZIPINFO);
++    ensure_path_unmounted("/data");
+ 
+     return 0;
+ }
+ 
+-static int try_recovery_update_package(const char *path) {
++static void set_new_package_path(void ) {
++    struct bootloader_message boot {};
++    std::string err;
++
++    read_bootloader_message(&boot,  &err);
++
++    printf("boot.command: %s\n", boot.command);
++    printf("boot.recovery: %s\n", boot.recovery);
++
++    strcpy(boot.recovery, "recovery\n--update_package=/data/update.zip");
++
++    printf("boot.recovery: %s\n", boot.recovery);
++
++    printf("write_bootloader_message \n");
++    if (!write_bootloader_message(boot, &err)) {
++        printf("%s\n", err.c_str());
++        printf("write_bootloader_message failed!\n");
++    }
++}
++
++static int try_recovery_update_package(void) {
+    int ret = 0;
+-   if (strncmp(path, "/data/", 6)==0) {
+-       printf("start to format data partition!\n");
+-       format_volume("/data");
+-   } else {
+-       printf("update package not from data partition!\n");
+-       return -1;
+-   }
++   struct stat st;
+ 
+-   ret = ensure_path_mounted(path);
++    if (stat(CACHE_ZIPINFO, &st) == -1) {
++        printf("no need to recovery update.zip");
++        return -1;
++    }
++
++   ret = ensure_path_mounted("/data");
+    if (ret != 0 ) {
+-       printf("mount /data after format failed!\n");
+-       return -1;
++       printf("mount /data failed, start to format!\n");
++       format_volume("/data");
++       ret = ensure_path_mounted("/data");
++       if (ret != 0) {
++           printf("mount /data after format failed!");
++           return -1;
++       }
+    }
+ 
+    ret = try_recovery_by_zipinfo();
+@@ -667,12 +692,23 @@ static int try_recovery_update_package(const char *path) {
+        return -1;
+    }
+ 
++   ret = ensure_path_mounted("/data");
++   if (ret != 0) {
++       printf("mount /data after recovery failed!");
++       return -1;
++   }
++
++   set_new_package_path();
++   unlink(CACHE_ZIPINFO);
++
+    return 0;
+ }
+ 
+ static int really_install_package(const std::string& path, bool* wipe_cache, bool needs_mount,
+                                   std::vector<std::string>* log_buffer, int retry_count,
+                                   int* max_temperature) {
++  int update_flag = 0;
++  std::string new_path("/data/update.zip");
+   ui->SetBackground(RecoveryUI::INSTALLING_UPDATE);
+   ui->Print("Finding update package...\n");
+   // Give verification half the progress bar...
+@@ -685,21 +721,31 @@ static int really_install_package(const std::string& path, bool* wipe_cache, boo
+ 
+   if (needs_mount) {
+     if (path[0] == '@') {
+-      ensure_path_mounted(path.substr(1).c_str());
++      int ret = 0;
++      ret = try_recovery_update_package();
++      if (ret == 0) {
++          update_flag = 1;
++      } else {
++          ensure_path_mounted(path.substr(1).c_str());
++      }
+     } else {
+-        int ret = 0;
+-        ret = ensure_path_mounted(path.c_str());
+-        if (ret != 0) {
+-          try_recovery_update_package(path.c_str());
+-        }
++        ensure_path_mounted(path.c_str());
+     }
+   }
+ 
+   MemMapping map;
+-  if (!map.MapFile(path)) {
+-    LOG(ERROR) << "failed to map file";
+-    log_buffer->push_back(android::base::StringPrintf("error: %d", kMapFileFailure));
+-    return INSTALL_CORRUPT;
++  if (update_flag == 1) {
++    if (!map.MapFile(new_path)) {
++      LOG(ERROR) << "failed to map file";
++      log_buffer->push_back(android::base::StringPrintf("error: %d", kMapFileFailure));
++      return INSTALL_CORRUPT;
++    }
++  } else {
++    if (!map.MapFile(path)) {
++      LOG(ERROR) << "failed to map file";
++      log_buffer->push_back(android::base::StringPrintf("error: %d", kMapFileFailure));
++      return INSTALL_CORRUPT;
++    }
+   }
+ 
+   // Verify package.
+@@ -710,7 +756,12 @@ static int really_install_package(const std::string& path, bool* wipe_cache, boo
+ 
+   // Try to open the package.
+   ZipArchiveHandle zip;
+-  int err = OpenArchiveFromMemory(map.addr, map.length, path.c_str(), &zip);
++  int err = 0;
++  if (update_flag == 1) {
++      err = OpenArchiveFromMemory(map.addr, map.length, new_path.c_str(), &zip);
++  } else {
++      err = OpenArchiveFromMemory(map.addr, map.length, path.c_str(), &zip);
++  }
+   if (err != 0) {
+     LOG(ERROR) << "Can't open " << path << " : " << ErrorCodeString(err);
+     log_buffer->push_back(android::base::StringPrintf("error: %d", kZipOpenFailure));
+@@ -732,7 +783,12 @@ static int really_install_package(const std::string& path, bool* wipe_cache, boo
+     ui->Print("Retry attempt: %d\n", retry_count);
+   }
+   ui->SetEnableReboot(false);
+-  int result = try_update_binary(path, zip, wipe_cache, log_buffer, retry_count, max_temperature);
++  int result = 0;
++  if (update_flag == 1) {
++      result = try_update_binary(new_path, zip, wipe_cache, log_buffer, retry_count, max_temperature);
++  } else {
++      result = try_update_binary(path, zip, wipe_cache, log_buffer, retry_count, max_temperature);
++  }
+   ui->SetEnableReboot(true);
+   ui->Print("\n");
+ 
+-- 
+1.9.1
+
