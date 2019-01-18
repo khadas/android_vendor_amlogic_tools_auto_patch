@@ -1,6 +1,6 @@
-From 2ac636f2bea739d49aba70fb512ab982f8cc7263 Mon Sep 17 00:00:00 2001
-From: Lei Qian <lei.qian@amlogic.com>
-Date: Fri, 21 Dec 2018 21:00:26 +0800
+From c158b8bd620b7d7a1525f2228df0cacda9a107fe Mon Sep 17 00:00:00 2001
+From: Luan Yuan <luan.yuan@amlogic.com>
+Date: Thu, 17 Jan 2019 16:27:52 +0800
 Subject: [PATCH] imageserver:remove imageserver to aosp only [2/2]
 
 PD#SWPL-2263
@@ -14,14 +14,16 @@ remove imageserver to aosp only
 Verify:
 Verify on Ampere
 
-Change-Id: I5dd020600c298feec6ae8827a2e9caa2ef20fbdd
-Signed-off-by: Lei Qian <lei.qian@amlogic.com>
+Change-Id: Ia6ba5a46735a4f0a9006a0451e4f1d31abfb1a08
+Signed-off-by: Luan Yuan <luan.yuan@amlogic.com>
 ---
  ampere/manifest.xml     | 9 +++++++++
  braun/manifest.xml      | 9 +++++++++
  curie/manifest.xml      | 9 +++++++++
  darwin/manifest.xml     | 9 +++++++++
  einstein/manifest.xml   | 9 +++++++++
+ faraday/manifest.xml    | 9 +++++++++
+ fermi/manifest.xml      | 9 +++++++++
  franklin/manifest.xml   | 9 +++++++++
  galilei/manifest.xml    | 9 +++++++++
  hertz/manifest.xml      | 9 +++++++++
@@ -30,8 +32,6 @@ Signed-off-by: Lei Qian <lei.qian@amlogic.com>
  t962_p321/manifest.xml  | 9 +++++++++
  t962x2_skt/manifest.xml | 9 +++++++++
  t962x_r314/manifest.xml | 9 +++++++++
- u200/manifest.xml       | 9 +++++++++
- u221/manifest.xml       | 9 +++++++++
  15 files changed, 135 insertions(+)
 
 diff --git a/ampere/manifest.xml b/ampere/manifest.xml
@@ -54,7 +54,7 @@ index c7a17a7..8e5f13f 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/braun/manifest.xml b/braun/manifest.xml
-index c1e61f5..0628660 100644
+index 10cc8b3..5cf2ed0 100644
 --- a/braun/manifest.xml
 +++ b/braun/manifest.xml
 @@ -1,5 +1,14 @@
@@ -92,7 +92,7 @@ index c7a17a7..8e5f13f 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/darwin/manifest.xml b/darwin/manifest.xml
-index dfce1b6..d4f9cfa 100644
+index 9c55127..9fa0e82 100644
 --- a/darwin/manifest.xml
 +++ b/darwin/manifest.xml
 @@ -1,5 +1,14 @@
@@ -111,7 +111,7 @@ index dfce1b6..d4f9cfa 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/einstein/manifest.xml b/einstein/manifest.xml
-index e070fd5..9c7c278 100644
+index b95ab30..71f219d 100644
 --- a/einstein/manifest.xml
 +++ b/einstein/manifest.xml
 @@ -1,5 +1,14 @@
@@ -129,8 +129,46 @@ index e070fd5..9c7c278 100644
          <name>android.hardware.configstore</name>
          <transport>hwbinder</transport>
          <version>1.1</version>
+diff --git a/faraday/manifest.xml b/faraday/manifest.xml
+index 32b5ae0..ad93bae 100644
+--- a/faraday/manifest.xml
++++ b/faraday/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
+diff --git a/fermi/manifest.xml b/fermi/manifest.xml
+index 3286dad..04bf3e8 100644
+--- a/fermi/manifest.xml
++++ b/fermi/manifest.xml
+@@ -1,5 +1,14 @@
+ <manifest version="1.0" type="device" target-level="3">
+     <hal format="hidl">
++        <name>vendor.amlogic.hardware.imageserver</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IImageService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+         <version>1.1</version>
 diff --git a/franklin/manifest.xml b/franklin/manifest.xml
-index f60bce7..8b5ba59 100644
+index 78f920a..c544506 100644
 --- a/franklin/manifest.xml
 +++ b/franklin/manifest.xml
 @@ -1,5 +1,14 @@
@@ -187,7 +225,7 @@ index f77fac1..f982d11 100644
          <transport>hwbinder</transport>
          <version>1.0</version>
 diff --git a/lyell/manifest.xml b/lyell/manifest.xml
-index e070fd5..9c7c278 100644
+index b95ab30..71f219d 100644
 --- a/lyell/manifest.xml
 +++ b/lyell/manifest.xml
 @@ -1,5 +1,14 @@
@@ -206,7 +244,7 @@ index e070fd5..9c7c278 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/marconi/manifest.xml b/marconi/manifest.xml
-index dfce1b6..d4f9cfa 100644
+index 9c55127..9fa0e82 100644
 --- a/marconi/manifest.xml
 +++ b/marconi/manifest.xml
 @@ -1,5 +1,14 @@
@@ -225,7 +263,7 @@ index dfce1b6..d4f9cfa 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/t962_p321/manifest.xml b/t962_p321/manifest.xml
-index e070fd5..9c7c278 100644
+index b95ab30..71f219d 100644
 --- a/t962_p321/manifest.xml
 +++ b/t962_p321/manifest.xml
 @@ -1,5 +1,14 @@
@@ -244,7 +282,7 @@ index e070fd5..9c7c278 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/t962x2_skt/manifest.xml b/t962x2_skt/manifest.xml
-index dfce1b6..d4f9cfa 100644
+index 9c55127..9fa0e82 100644
 --- a/t962x2_skt/manifest.xml
 +++ b/t962x2_skt/manifest.xml
 @@ -1,5 +1,14 @@
@@ -263,47 +301,9 @@ index dfce1b6..d4f9cfa 100644
          <transport>hwbinder</transport>
          <version>1.1</version>
 diff --git a/t962x_r314/manifest.xml b/t962x_r314/manifest.xml
-index e070fd5..9c7c278 100644
+index b95ab30..71f219d 100644
 --- a/t962x_r314/manifest.xml
 +++ b/t962x_r314/manifest.xml
-@@ -1,5 +1,14 @@
- <manifest version="1.0" type="device" target-level="3">
-     <hal format="hidl">
-+        <name>vendor.amlogic.hardware.imageserver</name>
-+        <transport>hwbinder</transport>
-+        <version>1.0</version>
-+        <interface>
-+            <name>IImageService</name>
-+            <instance>default</instance>
-+        </interface>
-+    </hal>
-+    <hal format="hidl">
-         <name>android.hardware.configstore</name>
-         <transport>hwbinder</transport>
-         <version>1.1</version>
-diff --git a/u200/manifest.xml b/u200/manifest.xml
-index 3286dad..04bf3e8 100644
---- a/u200/manifest.xml
-+++ b/u200/manifest.xml
-@@ -1,5 +1,14 @@
- <manifest version="1.0" type="device" target-level="3">
-     <hal format="hidl">
-+        <name>vendor.amlogic.hardware.imageserver</name>
-+        <transport>hwbinder</transport>
-+        <version>1.0</version>
-+        <interface>
-+            <name>IImageService</name>
-+            <instance>default</instance>
-+        </interface>
-+    </hal>
-+    <hal format="hidl">
-         <name>android.hardware.configstore</name>
-         <transport>hwbinder</transport>
-         <version>1.1</version>
-diff --git a/u221/manifest.xml b/u221/manifest.xml
-index 32b5ae0..ad93bae 100644
---- a/u221/manifest.xml
-+++ b/u221/manifest.xml
 @@ -1,5 +1,14 @@
  <manifest version="1.0" type="device" target-level="3">
      <hal format="hidl">
