@@ -1,26 +1,13 @@
-From 37688571fb41d47722ef59120f8078a320bfc59d Mon Sep 17 00:00:00 2001
+From 2b8a6267b7c713f36e9b94905e05f400f6255901 Mon Sep 17 00:00:00 2001
 From: Rongjun Chen <rongjun.chen@amlogic.com>
-Date: Wed, 28 Nov 2018 16:20:35 +0800
-Subject: [PATCH] wifi: add multi wifi support [6/6]
+Date: Fri, 18 Jan 2019 16:49:21 +0800
+Subject: [PATCH] wifi: fix multi wifi cts test fail issue
 
-PD#SWPL-2210
-
-Problem:
-multi wifi not support
-
-Solution:
-add multi wifi support
-
-Verify:
-ampere
-
-Change-Id: Ifb806200ced41f61650886b6f488232ce0535bde
-Signed-off-by: Rongjun Chen <rongjun.chen@amlogic.com>
+Change-Id: I373148da9c5e20569ab1b2057329bcaa938a23e0
 ---
- libwifi_hal/Android.mk                |   5 +-
- libwifi_hal/wifi_hal_common.cpp       | 147 +++++++++++++++++++++++++++++++---
- libwifi_system/supplicant_manager.cpp |  44 +++++++++-
- 3 files changed, 179 insertions(+), 17 deletions(-)
+ libwifi_hal/Android.mk          |   5 +-
+ libwifi_hal/wifi_hal_common.cpp | 147 ++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 138 insertions(+), 14 deletions(-)
 
 diff --git a/libwifi_hal/Android.mk b/libwifi_hal/Android.mk
 index 58e81ff..dd8f3c0 100644
@@ -246,84 +233,6 @@ index 413daf7..efc61f0 100644
  
    if (!fwpath) return ret;
    fd = TEMP_FAILURE_RETRY(open(WIFI_DRIVER_FW_PATH_PARAM, O_WRONLY));
-diff --git a/libwifi_system/supplicant_manager.cpp b/libwifi_system/supplicant_manager.cpp
-index 5667648..a79caa8 100644
---- a/libwifi_system/supplicant_manager.cpp
-+++ b/libwifi_system/supplicant_manager.cpp
-@@ -22,18 +22,44 @@
- #include <string.h>
- #include <sys/stat.h>
- #include <unistd.h>
--
-+#include <stdint.h>
- // This ugliness is necessary to access internal implementation details
- // of the property subsystem.
- #define _REALLY_INCLUDE_SYS__SYSTEM_PROPERTIES_H_
- #include <sys/_system_properties.h>
- 
-+#define MULTI_WIFI_SUPPORT
-+#ifdef MULTI_WIFI_SUPPORT
-+#include <dlfcn.h>
-+static int is_bcm_driver_loaded() {
-+    FILE *proc;
-+    char line[sizeof("bcmdhd")+15];
-+
-+    /*
-+     * If the property says the driver is loaded, check to
-+     * make sure that the property setting isn't just left
-+     * over from a previous manual shutdown or a runtime
-+     * crash.
-+     */
-+    if ((proc = fopen("/proc/modules", "r")) == NULL) {
-+        return 0;
-+    }
-+    while ((fgets(line, sizeof(line), proc)) != NULL) {
-+        if (strncmp(line, "dhd", 3) == 0 || strncmp(line, "bcmdhd", 6) == 0) {
-+            fclose(proc);
-+            return 1;
-+        }
-+    }
-+    fclose(proc);
-+    return 0;
-+}
-+#endif
- namespace android {
- namespace wifi_system {
- namespace {
- 
--const char kSupplicantInitProperty[] = "init.svc.wpa_supplicant";
--const char kSupplicantServiceName[] = "wpa_supplicant";
-+char kSupplicantInitProperty[] = "init.svc.wpa_supplicant";
-+char kSupplicantServiceName[] = "wpa_supplicant";
- 
- }  // namespace
- 
-@@ -42,6 +68,12 @@ bool SupplicantManager::StartSupplicant() {
-   int count = 200; /* wait at most 20 seconds for completion */
-   const prop_info* pi;
-   unsigned serial = 0;
-+#ifdef MULTI_WIFI_SUPPORT
-+  if (is_bcm_driver_loaded() != 1) {
-+    strcpy(kSupplicantInitProperty, "init.svc.rtl_supplicant");
-+    strcpy(kSupplicantServiceName, "rtl_supplicant");
-+  }
-+#endif
- 
-   /* Check whether already running */
-   if (property_get(kSupplicantInitProperty, supp_status, NULL) &&
-@@ -90,6 +122,12 @@ bool SupplicantManager::StartSupplicant() {
- bool SupplicantManager::StopSupplicant() {
-   char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
-   int count = 50; /* wait at most 5 seconds for completion */
-+#ifdef MULTI_WIFI_SUPPORT
-+  if (is_bcm_driver_loaded() != 1) {
-+    strcpy(kSupplicantInitProperty, "init.svc.rtl_supplicant");
-+    strcpy(kSupplicantServiceName, "rtl_supplicant");
-+  }
-+#endif
- 
-   /* Check whether supplicant already stopped */
-   if (property_get(kSupplicantInitProperty, supp_status, NULL) &&
 -- 
 1.9.1
 
