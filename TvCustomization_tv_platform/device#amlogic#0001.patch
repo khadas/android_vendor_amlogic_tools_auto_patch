@@ -40,7 +40,7 @@ index 10cc8b3..47706f9 100644
 +    <hal>
          <name>vendor.amlogic.hardware.systemcontrol</name>
          <transport>hwbinder</transport>
-         <version>1.0</version>
+         <version>1.1</version>
 @@ -183,6 +192,15 @@
          </interface>
      </hal>
@@ -76,7 +76,7 @@ index b3b151c..06ecf17 100644
 +    <hal>
          <name>vendor.amlogic.hardware.systemcontrol</name>
          <transport>hwbinder</transport>
-         <version>1.0</version>
+         <version>1.1</version>
 @@ -203,6 +212,15 @@
          </interface>
      </hal>
