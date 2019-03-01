@@ -1,4 +1,4 @@
-From a75185898a07258687d65b3199198391429d3898 Mon Sep 17 00:00:00 2001
+From 516cb3385c7f90ae54f6f8dfc03bd0d9dc402789 Mon Sep 17 00:00:00 2001
 From: Chaomin Zheng <chaomin.zheng@amlogic.com>
 Date: Fri, 25 Jan 2019 15:15:05 +0800
 Subject: [PATCH] audio policy: fix speaker gain calculation [2/4]
@@ -17,10 +17,10 @@ verify by p321
 Change-Id: Ided188523c578c8fa78ca4c832afdd7d96c126a6
 Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
 ---
- .../include/AudioOutputDescriptor.h                |  6 ++--
- .../src/AudioOutputDescriptor.cpp                  | 25 +++++++++-------
- .../managerdefault/AudioPolicyManager.cpp          | 34 ++++++++++++----------
- 3 files changed, 36 insertions(+), 29 deletions(-)
+ .../include/AudioOutputDescriptor.h                |  6 ++-
+ .../src/AudioOutputDescriptor.cpp                  | 25 +++++++------
+ .../managerdefault/AudioPolicyManager.cpp          | 43 ++++++++++++----------
+ 3 files changed, 42 insertions(+), 32 deletions(-)
 
 diff --git a/services/audiopolicy/common/managerdefinitions/include/AudioOutputDescriptor.h b/services/audiopolicy/common/managerdefinitions/include/AudioOutputDescriptor.h
 index 7288551..d4b8c3d 100644
@@ -94,10 +94,10 @@ index 74c085f..d062149 100644
      struct audio_port_config newConfig;
      struct audio_port_config backupConfig;
 diff --git a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
-index a71312a..1c7c4d7 100644
+index a71312a..0b08389 100644
 --- a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
 +++ b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
-@@ -5660,29 +5660,31 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
+@@ -5660,29 +5660,34 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
  
      if (mIsPlatformTelevision) {
          audio_devices_t curDevice = Volume::getDeviceForVolume(getDevicesForStream(AUDIO_STREAM_MUSIC));
@@ -106,15 +106,18 @@ index a71312a..1c7c4d7 100644
 -            (curDevice & AUDIO_DEVICE_OUT_SPEAKER)) {
 -            volumeDb = 0.0f;
 -        }
+-        if (curDevice == AUDIO_DEVICE_OUT_SPEAKER && outputDesc->isStreamActive(stream)) {
 +        bool speakerGainApplied = false;
-         if (curDevice == AUDIO_DEVICE_OUT_SPEAKER && outputDesc->isStreamActive(stream)) {
++        bool bootVideoRunning = property_get_int32("service.bootvideo.exit", 0) == 0;
++        if (curDevice == AUDIO_DEVICE_OUT_SPEAKER &&
++                (outputDesc->isStreamActive(stream) || bootVideoRunning)) {
              //ignoring the "index" passed as argument and always use MUSIC stream index
              //for all stream types works on TV because all stream types are aliases of MUSIC.
              int volumeIndex = mVolumeCurves->getVolumeIndex(AUDIO_STREAM_MUSIC, curDevice);
              int volumeMaxIndex = mVolumeCurves->getVolumeIndexMax(AUDIO_STREAM_MUSIC);
 -            float mediaVolume = (float) volumeIndex / (float) volumeMaxIndex;
- 
-             if (volumeMaxIndex == 1) {
+-
+-            if (volumeMaxIndex == 1) {
 -                char defaultMediaVolume[PROPERTY_VALUE_MAX];
 -                char volumeStep[PROPERTY_VALUE_MAX];
 -                if (property_get("ro.config.media_vol_default", defaultMediaVolume, NULL)
@@ -125,9 +128,7 @@ index a71312a..1c7c4d7 100644
 -                }
 -            }
 -            outputDesc->updateGain(stream, curDevice, mediaVolume);
-+                volumeMaxIndex = property_get_int32("ro.config.media_vol_steps", 100);
-+                volumeIndex = property_get_int32("ro.config.media_vol_default", volumeMaxIndex / 4);
-+            }
++
 +            float musicVolumeDb = mVolumeCurves->volIndexToDb(AUDIO_STREAM_MUSIC,
 +                                        Volume::getDeviceCategory(curDevice), volumeIndex);
 +            float maxMusicVolumeDb = mVolumeCurves->volIndexToDb(AUDIO_STREAM_MUSIC,
@@ -135,6 +136,11 @@ index a71312a..1c7c4d7 100644
 +            float minMusicVolumeDb = mVolumeCurves->volIndexToDb(AUDIO_STREAM_MUSIC,
 +                                        Volume::getDeviceCategory(curDevice),
 +                                        mVolumeCurves->getVolumeIndexMin(AUDIO_STREAM_MUSIC));
++            if (bootVideoRunning) {
++                maxMusicVolumeDb = 0.0f;
++                minMusicVolumeDb = -10000.0f;
++                musicVolumeDb = -1837.0f;
++            }
 +            speakerGainApplied = outputDesc->updateGain(curDevice,
 +                                        musicVolumeDb, minMusicVolumeDb, maxMusicVolumeDb);
 +        }
