@@ -108,7 +108,7 @@ index a71312a..0b08389 100644
 -        }
 -        if (curDevice == AUDIO_DEVICE_OUT_SPEAKER && outputDesc->isStreamActive(stream)) {
 +        bool speakerGainApplied = false;
-+        bool bootVideoRunning = property_get_int32("service.bootvideo.exit", 0) == 0;
++        bool bootVideoRunning = property_get_int32("service.bootvideo.exit", 0) == 1;
 +        if (curDevice == AUDIO_DEVICE_OUT_SPEAKER &&
 +                (outputDesc->isStreamActive(stream) || bootVideoRunning)) {
              //ignoring the "index" passed as argument and always use MUSIC stream index
