@@ -1,4 +1,4 @@
-From 08946c74d6333ba0cdb3ed3920525321cc9b0723 Mon Sep 17 00:00:00 2001
+From a855c05fb219e5d1f73dabca629e9a26f760cc64 Mon Sep 17 00:00:00 2001
 From: Chaomin Zheng <chaomin.zheng@amlogic.com>
 Date: Sat, 15 Dec 2018 16:45:35 +0800
 Subject: [PATCH] TvInputHardawreManager: use listAudioPorts replace
@@ -18,13 +18,22 @@ verify by p321
 Change-Id: I1e7b619eb0f5fa1cc985fab5fd17459c1bc16701
 Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
 ---
- .../android/server/tv/TvInputHardwareManager.java  | 97 ++++++++++++++++++----
- 1 file changed, 80 insertions(+), 17 deletions(-)
+ .../android/server/tv/TvInputHardwareManager.java  | 124 ++++++++++++++++++---
+ 1 file changed, 106 insertions(+), 18 deletions(-)
 
 diff --git a/services/core/java/com/android/server/tv/TvInputHardwareManager.java b/services/core/java/com/android/server/tv/TvInputHardwareManager.java
-index c4c9da7..0b0a2fb 100644
+index c4c9da7..082bfa9 100644
 --- a/services/core/java/com/android/server/tv/TvInputHardwareManager.java
 +++ b/services/core/java/com/android/server/tv/TvInputHardwareManager.java
+@@ -19,7 +19,7 @@ package com.android.server.tv;
+ import static android.media.tv.TvInputManager.INPUT_STATE_CONNECTED;
+ import static android.media.tv.TvInputManager.INPUT_STATE_CONNECTED_STANDBY;
+ import static android.media.tv.TvInputManager.INPUT_STATE_DISCONNECTED;
+-
++import android.bluetooth.BluetoothA2dp;
+ import android.content.BroadcastReceiver;
+ import android.content.Context;
+ import android.content.Intent;
 @@ -32,6 +32,11 @@ import android.hardware.hdmi.IHdmiControlService;
  import android.hardware.hdmi.IHdmiDeviceEventListener;
  import android.hardware.hdmi.IHdmiHotplugEventListener;
@@ -37,7 +46,7 @@ index c4c9da7..0b0a2fb 100644
  import android.media.AudioDevicePort;
  import android.media.AudioFormat;
  import android.media.AudioGain;
-@@ -148,6 +153,50 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -148,6 +153,75 @@ class TvInputHardwareManager implements TvInputHal.Callback {
              filter.addAction(AudioManager.STREAM_MUTE_CHANGED_ACTION);
              mContext.registerReceiver(mVolumeReceiver, filter);
              updateVolume();
@@ -85,10 +94,35 @@ index c4c9da7..0b0a2fb 100644
 +                    new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED);
 +            usbFilter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
 +            mContext.registerReceiver(hostReceiver, usbFilter);
++            BroadcastReceiver a2dpReceiver = new BroadcastReceiver() {
++                @Override
++                public void onReceive(Context context, Intent intent) {
++                    int state = intent.getIntExtra(BluetoothA2dp.EXTRA_STATE, -1);
++                        if (state == BluetoothA2dp.STATE_CONNECTED ||
++                            state == BluetoothA2dp.STATE_DISCONNECTED) {
++                            mHandler.postDelayed(new Runnable() {
++                            public void run() {
++                                synchronized (mLock) {
++                                    for (int i = 0; i < mConnections.size(); ++i) {
++                                        TvInputHardwareImpl impl =
++                                                mConnections.valueAt(i).getHardwareImplLocked();
++                                        if (impl != null) {
++                                            impl.handleAudioSinkUpdated();
++                                        }
++                                    }
++                                }
++                            }
++                        }, state == BluetoothA2dp.STATE_CONNECTED ? 600 : 2000);
++                    }
++                }
++            };
++            final IntentFilter a2dpFilter =
++                    new IntentFilter(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
++            mContext.registerReceiver(a2dpReceiver, a2dpFilter);
          }
      }
  
-@@ -790,15 +839,20 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -790,15 +864,20 @@ class TvInputHardwareManager implements TvInputHal.Callback {
  
          private void findAudioSinkFromAudioPolicy(List<AudioDevicePort> sinks) {
              sinks.clear();
@@ -115,7 +149,7 @@ index c4c9da7..0b0a2fb 100644
                  }
              }
          }
-@@ -807,13 +861,18 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -807,13 +886,18 @@ class TvInputHardwareManager implements TvInputHal.Callback {
              if (type == AudioManager.DEVICE_NONE) {
                  return null;
              }
@@ -139,7 +173,7 @@ index c4c9da7..0b0a2fb 100644
                  }
              }
              return null;
-@@ -1293,14 +1352,18 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -1293,14 +1377,18 @@ class TvInputHardwareManager implements TvInputHal.Callback {
          IHdmiSystemAudioModeChangeListener.Stub {
          @Override
          public void onStatusChanged(boolean enabled) throws RemoteException {
