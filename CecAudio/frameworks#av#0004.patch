@@ -1,4 +1,4 @@
-From 516cb3385c7f90ae54f6f8dfc03bd0d9dc402789 Mon Sep 17 00:00:00 2001
+From 9693e4ae83c16ee2bb3f85ae516515f961af630a Mon Sep 17 00:00:00 2001
 From: Chaomin Zheng <chaomin.zheng@amlogic.com>
 Date: Fri, 25 Jan 2019 15:15:05 +0800
 Subject: [PATCH] audio policy: fix speaker gain calculation [2/4]
@@ -47,7 +47,7 @@ index 7288551..d4b8c3d 100644
      const sp<IOProfile> mProfile;          // I/O profile this output derives from
      audio_io_handle_t mIoHandle;           // output handle
 diff --git a/services/audiopolicy/common/managerdefinitions/src/AudioOutputDescriptor.cpp b/services/audiopolicy/common/managerdefinitions/src/AudioOutputDescriptor.cpp
-index 74c085f..d062149 100644
+index 74c085f..e8e780f 100644
 --- a/services/audiopolicy/common/managerdefinitions/src/AudioOutputDescriptor.cpp
 +++ b/services/audiopolicy/common/managerdefinitions/src/AudioOutputDescriptor.cpp
 @@ -218,14 +218,18 @@ void AudioOutputDescriptor::log(const char* indent)
@@ -85,16 +85,16 @@ index 74c085f..d062149 100644
 -        gainValue = gainMaxValueInMb;
 -    }
 +
-+    int gainValue = ((int)(volumeDb - minVolumeDb) * (gainMaxValueInMb - gainMinValueInMb))
++    int gainValue = ((int)((volumeDb - minVolumeDb) * (gainMaxValueInMb - gainMinValueInMb)))
 +        / (int)(maxVolumeDb - minVolumeDb) + gainMinValueInMb;
-+    gainValue = (gainValue / gainStepValueInMb) * gainStepValueInMb;
++    gainValue = (int)(((float)gainValue / gainStepValueInMb) * gainStepValueInMb);
 +
 +    std::max(gainMinValueInMb, std::min(gainValue, gainMaxValueInMb));
  
      struct audio_port_config newConfig;
      struct audio_port_config backupConfig;
 diff --git a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
-index a71312a..0b08389 100644
+index a71312a..2ff94e8 100644
 --- a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
 +++ b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
 @@ -5660,29 +5660,34 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,

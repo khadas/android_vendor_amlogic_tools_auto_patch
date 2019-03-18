@@ -1,4 +1,4 @@
-From 427eb89f989815f73fb6510ab78234d3dc7320c3 Mon Sep 17 00:00:00 2001
+From 918043503a3800ce89f24232faf95ca98e8113f2 Mon Sep 17 00:00:00 2001
 From: Chaomin Zheng <chaomin.zheng@amlogic.com>
 Date: Fri, 25 Jan 2019 15:11:00 +0800
 Subject: [PATCH] TV input hardware: apply volume curves to source gain [3/4]
@@ -23,7 +23,7 @@ Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
  1 file changed, 84 insertions(+), 33 deletions(-)
 
 diff --git a/services/core/java/com/android/server/tv/TvInputHardwareManager.java b/services/core/java/com/android/server/tv/TvInputHardwareManager.java
-index 968f1f4..6fe3c2d 100644
+index 0b0a2fb..370af5c 100644
 --- a/services/core/java/com/android/server/tv/TvInputHardwareManager.java
 +++ b/services/core/java/com/android/server/tv/TvInputHardwareManager.java
 @@ -114,7 +114,9 @@ class TvInputHardwareManager implements TvInputHal.Callback {
@@ -44,7 +44,7 @@ index 968f1f4..6fe3c2d 100644
          mCurrentIndex = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
      }
  
-@@ -822,7 +825,7 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -819,7 +822,7 @@ class TvInputHardwareManager implements TvInputHal.Callback {
          private AudioPatch mAudioPatch = null;
          // Set to an invalid value for a volume, so that current volume can be applied at the
          // first call to updateAudioConfigLocked().
@@ -53,7 +53,7 @@ index 968f1f4..6fe3c2d 100644
          private float mSourceVolume = 1.0f;
  
          private TvStreamConfig mActiveConfig = null;
-@@ -939,6 +942,36 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -936,6 +939,36 @@ class TvInputHardwareManager implements TvInputHal.Callback {
          }
  
          /**
@@ -79,9 +79,9 @@ index 968f1f4..6fe3c2d 100644
 +                                                            device);
 +
 +            // Rescale gain from dB to mB and within gain conroller range and snap to steps
-+            int gainMb = ((int)(gainDb - minGainDb) * (gain.maxValue() - gain.minValue()))
-+                            / (int)(maxGainDb - minGainDb) + gain.minValue();
-+            gainMb = (gainMb / gain.stepValue()) * gain.stepValue();
++            int gainMb = (int)((float)(((gainDb - minGainDb) * (gain.maxValue() - gain.minValue()))
++                            / (maxGainDb - minGainDb)) + gain.minValue());
++            gainMb = (int)(((float)gainMb / gain.stepValue()) * gain.stepValue());
 +
 +            return gainMb;
 +        }
@@ -90,7 +90,7 @@ index 968f1f4..6fe3c2d 100644
           * Update audio configuration (source, sink, patch) all up to current state.
           */
          private void updateAudioConfigLocked() {
-@@ -952,39 +985,11 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -949,39 +982,11 @@ class TvInputHardwareManager implements TvInputHal.Callback {
                      mAudioManager.releaseAudioPatch(mAudioPatch);
                      mAudioPatch = null;
                  }
@@ -132,7 +132,7 @@ index 968f1f4..6fe3c2d 100644
  
              AudioPortConfig sourceConfig = mAudioSource.activeConfig();
              List<AudioPortConfig> sinkConfigs = new ArrayList<>();
-@@ -1036,6 +1041,48 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -1033,6 +1038,48 @@ class TvInputHardwareManager implements TvInputHal.Callback {
                  }
                  sinkConfigs.add(sinkConfig);
              }
@@ -181,7 +181,7 @@ index 968f1f4..6fe3c2d 100644
              // sinkConfigs.size() == mAudioSink.size(), and mAudioSink is guaranteed to be
              // non-empty at the beginning of this method.
              AudioPortConfig sinkConfig = sinkConfigs.get(0);
-@@ -1072,7 +1119,6 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -1069,7 +1116,6 @@ class TvInputHardwareManager implements TvInputHal.Callback {
                  }
              }
              if (shouldRecreateAudioPatch) {
@@ -189,7 +189,7 @@ index 968f1f4..6fe3c2d 100644
                  if (mAudioPatch != null) {
                      mAudioManager.releaseAudioPatch(mAudioPatch);
                      audioPatchArray[0] = null;
-@@ -1082,11 +1128,16 @@ class TvInputHardwareManager implements TvInputHal.Callback {
+@@ -1079,11 +1125,16 @@ class TvInputHardwareManager implements TvInputHal.Callback {
                          new AudioPortConfig[] { sourceConfig },
                          sinkConfigs.toArray(new AudioPortConfig[sinkConfigs.size()]));
                  mAudioPatch = audioPatchArray[0];
@@ -208,5 +208,5 @@ index 968f1f4..6fe3c2d 100644
          }
  
 -- 
-2.7.4
+1.9.1
 
