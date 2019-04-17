@@ -16,7 +16,6 @@
 function auto_patch()
 {
     local patch_dir=$1
-    #echo "###patch_dir ${patch_dir##*/} "
 
     for file in $patch_dir/*
     do
@@ -30,19 +29,19 @@ function auto_patch()
             local change_id=`grep 'Change-Id' $file | cut -f 2 -d " "`
             if [ -d "$dir" ]
             then
-                cd $dir; #git log | grep $change_id 1>/dev/null 2>&1;
-                #if [ $? -ne 0 ]; then
-                    #echo "###patch ${file##*/}###      "
+                cd $dir; git log -n 100 | grep $change_id 1>/dev/null 2>&1;
+                if [ $? -ne 0 ]; then
+                    echo "###patch ${file##*/}###      "
                     cd $dir; git am -q $file 1>/dev/null 2>&1;
                     if [ $? != 0 ]
                     then
                         git am --abort
-                        echo "### patch_dir ${patch_dir##*/} failed,maybe already patched    "
+                        echo "### patch_dir ${patch_dir##*/} $file failed,maybe already patched    "
                         return 1
                     fi
-                #else
-                    # echo "###${file##*/} has patched###      "
-               # fi
+                else
+                    echo "###${file##*/} has patched###      "
+                fi
             fi
         fi
     done
@@ -87,21 +86,6 @@ function traverse_patch_dir()
 
 T=$(pwd)
 LOCAL_PATH=$T/$(dirname $0)/
-
-if [ "$1" = "clean" ]
-then
-    echo "clean auto patch flag"
-    rm $LOCAL_PATH.patched -f
-    exit 0
-fi
-
-if [ -f "$LOCAL_PATH.patched" ]
-then
-    echo "auto patch already applied!"
-    exit 0
-else
-    touch $LOCAL_PATH.patched
-fi
 
 need_tv_feature=$1
 is_android_tv=$2
