@@ -11,7 +11,6 @@ PD# 172191
 4.add read recovery params from factory_update_param.aml.
 5.add ui display when run recovery with no params.
 
-Change-Id: I84da705eefe9cb3ac9e573769992d0862e9e6a15
 
 recovery: add recovery.kl parse for key map[1/1]
 
@@ -19,7 +18,6 @@ PD# SWPL-620
 
 add function for parse /etc/recovery.kl.
 
-Change-Id: Ib6f42686ab94a2c2e0edd2485383171a0708b88d
 
 recovery: fixed can't auto reboot after upgrade[1/1]
 
@@ -27,7 +25,6 @@ PD# SWPL-1932
 
 modify recovery update process.
 
-Change-Id: I478ed386b80fe71ead33da822be3d1d12193f013
 
 recovery: add recovery update.zip from mmcblok0[1/1]
 
@@ -35,7 +32,6 @@ PD# SWPL-2031
 
 add recovery update from /dev/block/mmcblk0.
 
-Change-Id: I38f4e22716ca7a95f1d3320ffaf516e73fb91d68
 
 recovery: add update from backup package [1/3]
 
@@ -43,7 +39,6 @@ PD#TV-2110
 
 add update from backup package recovery from mmcblk0
 
-Change-Id: Icfa463e2e26adfc85febb5cae7fdc9b2bce173c6
 
 recovery: add param partition format support [1/1]
 

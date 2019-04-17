@@ -5,8 +5,6 @@ Subject: [PATCH] surfaceflinger: add omx skip optimize.[3/3]
 
 PD#166415
 
-Change-Id: Ib4a71430b6a4d43b19bd9ff635bea7adc055334e
-
 Display: fix sf crash used after free [1/1]
 
 PD#SWPL-1133
