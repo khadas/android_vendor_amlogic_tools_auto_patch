@@ -31,16 +31,15 @@ function auto_patch()
             then
                 cd $dir; git log -n 100 | grep $change_id 1>/dev/null 2>&1;
                 if [ $? -ne 0 ]; then
-                    echo "###patch ${file##*/}###      "
+                    #echo "###patch ${file##*/}###      "
                     cd $dir; git am -q $file 1>/dev/null 2>&1;
                     if [ $? != 0 ]
                     then
                         git am --abort
+                        echo "!!! Patch Warnning !!! "
                         echo "### patch_dir ${patch_dir##*/} $file failed,maybe already patched    "
                         return 1
                     fi
-                else
-                    echo "###${file##*/} has patched###      "
                 fi
             fi
         fi
@@ -81,6 +80,7 @@ function traverse_patch_dir()
             auto_patch $dest_dir
         fi
     done
+    echo "!!! Patch Finish !!! "
     cd $T
 }
 
