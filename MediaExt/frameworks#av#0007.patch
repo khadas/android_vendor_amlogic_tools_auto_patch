@@ -1,0 +1,1525 @@
+From 759e34b2c41e29d5b24d671648ceb31109561fb8 Mon Sep 17 00:00:00 2001
+From: Jian Wang <jian.wang@amlogic.com>
+Date: Fri, 26 Apr 2019 19:03:07 +0800
+Subject: [PATCH] Dolby Vision: add Dolby Vision patch for version 2.5
+
+PD#SWPL-7833
+
+add Dolby Vision patch
+commit 8dfdd25e2d46ec8001ac20a9525a30aa43a92dd2
+Author: Arun Johnson <Arun.Johnson@dolby.com>
+Date:   Tue Jun 26 11:40:37 2018 -0700
+
+    DVA-796 - Detect rpuAssoc and pass it down
+
+    Change-Id: I42b5ca7d9ed96684b6876c1d270c742c8de35de2
+
+commit 62de5cdf55a10c211008cf2a57c634609afd37af
+Author: Arun Johnson <Arun.Johnson@dolby.com>
+Date:   Tue Jun 26 11:20:45 2018 -0700
+
+    Dolby Vision and HEVC Transport stream (TS) Extractor
+
+    Change-Id: I4b56f9257df0be885233c0559fdc844c937600a3
+
+commit 70f282a77c891d7d8ed2c65412ce3dfbfd36a96b
+Author: Arun Johnson <Arun.Johnson@dolby.com>
+Date:   Mon Jun 25 10:04:52 2018 -0700
+
+    Dolby Vision MPEG4 Extractor
+
+    Change-Id: I8b88de1a63e3a79d815b6eb81b724870736e9c70
+
+Change-Id: I32faef87d5f3db120d2c4510f99a4839fcb68063
+Signed-off-by: Jian Wang <jian.wang@amlogic.com>
+---
+ media/extractors/mp4/Android.bp                    |   1 +
+ media/extractors/mp4/MPEG4Extractor.cpp            | 150 ++++++++++++++++++++-
+ .../include/media/stagefright/MetaDataBase.h       |  22 ++-
+ media/libstagefright/Android.bp                    |   5 +
+ media/libstagefright/HevcUtils.cpp                 |  58 +++++++-
+ media/libstagefright/MPEG4Writer.cpp               |  20 ++-
+ media/libstagefright/MetaDataUtils.cpp             |  36 ++++-
+ media/libstagefright/Utils.cpp                     | 103 +++++++++++++-
+ media/libstagefright/httplive/Android.bp           |   1 +
+ media/libstagefright/httplive/M3UParser.cpp        |  28 +++-
+ media/libstagefright/httplive/PlaylistFetcher.cpp  |  46 ++++++-
+ media/libstagefright/include/HevcUtils.h           |  25 +++-
+ .../include/media/stagefright/MetaDataUtils.h      |  20 ++-
+ media/libstagefright/mpeg2ts/ATSParser.cpp         | 144 ++++++++++++++++++--
+ media/libstagefright/mpeg2ts/ATSParser.h           |  29 +++-
+ media/libstagefright/mpeg2ts/Android.bp            |   1 +
+ media/libstagefright/mpeg2ts/ESQueue.cpp           |  75 ++++++++++-
+ media/libstagefright/mpeg2ts/ESQueue.h             |  33 ++++-
+ media/libstagefright/omx/Android.bp                |   3 +-
+ 19 files changed, 768 insertions(+), 32 deletions(-)
+
+diff --git a/media/extractors/mp4/Android.bp b/media/extractors/mp4/Android.bp
+index 40b2c97..3583f5c 100644
+--- a/media/extractors/mp4/Android.bp
++++ b/media/extractors/mp4/Android.bp
+@@ -29,6 +29,7 @@ cc_defaults {
+         "-Werror",
+         "-Wall",
+         "-fvisibility=hidden",
++        "-DDLB_VISION=1",
+     ],
+     version_script: "exports.lds",
+     relative_install_path: "extractors",
+diff --git a/media/extractors/mp4/MPEG4Extractor.cpp b/media/extractors/mp4/MPEG4Extractor.cpp
+index 22847d6..8b3ac00 100644
+--- a/media/extractors/mp4/MPEG4Extractor.cpp
++++ b/media/extractors/mp4/MPEG4Extractor.cpp
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2017 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "MPEG4Extractor"
+@@ -127,6 +141,9 @@ private:
+     bool mIsAVC;
+     bool mIsHEVC;
+     bool mIsAC4;
++#ifdef DLB_VISION
++    bool mIsDolbyVision;
++#endif
+ 
+     size_t mNALLengthSize;
+ 
+@@ -332,6 +349,15 @@ static const char *FourCC2MIME(uint32_t fourcc) {
+             return MEDIA_MIMETYPE_VIDEO_HEVC;
+         case FOURCC('a', 'c', '-', '4'):
+             return MEDIA_MIMETYPE_AUDIO_AC4;
++
++#ifdef DLB_VISION
++        case FOURCC('d', 'v', 'a', 'v'):
++        case FOURCC('d', 'v', 'a', '1'):
++        case FOURCC('d', 'v', 'h', 'e'):
++        case FOURCC('d', 'v', 'h', '1'):
++            return MEDIA_MIMETYPE_VIDEO_DOLBY_VISION;
++#endif
++
+         default:
+             ALOGW("Unknown fourcc: %c%c%c%c",
+                    (fourcc >> 24) & 0xff,
+@@ -1582,6 +1608,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
+         case FOURCC('a', 'v', 'c', '1'):
+         case FOURCC('h', 'v', 'c', '1'):
+         case FOURCC('h', 'e', 'v', '1'):
++#ifdef DLB_VISION
++        case FOURCC('d', 'v', 'a', 'v'):
++        case FOURCC('d', 'v', 'a', '1'):
++        case FOURCC('d', 'v', 'h', 'e'):
++        case FOURCC('d', 'v', 'h', '1'):
++#endif
+         {
+             uint8_t buffer[78];
+             if (chunk_data_size < (ssize_t)sizeof(buffer)) {
+@@ -1729,6 +1761,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
+                     // for audio, use 128KB
+                     max_size = 1024 * 128;
+                 } else if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
++#ifdef DLB_VISION
++                        || !strcmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)
++#endif
+                         || !strcmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+                     // AVC & HEVC requires compression ratio of at least 2, and uses
+                     // macroblocks
+@@ -2022,6 +2057,34 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
+             break;
+         }
+ 
++#ifdef DLB_VISION
++        case FOURCC('d', 'v', 'c', 'C'):
++        case FOURCC('d', 'v', 'v', 'C'):
++        {
++            sp<ABuffer> buffer = new ABuffer(chunk_data_size);
++
++            if (buffer->data() == NULL) {
++                ALOGE("b/28471206");
++                return NO_MEMORY;
++            }
++
++            if (mDataSource->readAt(
++                        data_offset, buffer->data(), chunk_data_size) < chunk_data_size) {
++                return ERROR_IO;
++            }
++
++            if (mLastTrack == NULL)
++                return ERROR_MALFORMED;
++
++            mLastTrack->meta.setData(
++                    kKeyDVCC, kTypeDVCC, buffer->data(), chunk_data_size);
++
++            mLastTrack->meta.setCString(kKeyMIMEType,MEDIA_MIMETYPE_VIDEO_DOLBY_VISION);
++            *offset += chunk_size;
++            break;
++        }
++#endif
++
+         case FOURCC('d', '2', '6', '3'):
+         {
+             *offset += chunk_size;
+@@ -3677,6 +3740,22 @@ MediaTrack *MPEG4Extractor::getTrack(size_t index) {
+             itemTable = mItemTable;
+         }
+     }
++#ifdef DLB_VISION
++      else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
++        uint32_t type;
++        const void *data;
++        size_t size;
++        if (!track->meta.findData(kKeyDVCC, &type, &data, &size)) {
++            return NULL;
++        }
++
++        const uint8_t *ptr = (const uint8_t *)data;
++
++        if (size != 24 || ptr[0] != 1 || ptr[1] != 0) {  // dv_version_major == 1, dv_version_minor == 0;
++            return NULL;
++        }
++    }
++#endif
+ 
+     MPEG4Source *source =  new MPEG4Source(
+             track->meta, mDataSource, track->timescale, track->sampleTable,
+@@ -3706,6 +3785,13 @@ status_t MPEG4Extractor::verifyTrack(Track *track) {
+                     || type != kTypeHVCC) {
+             return ERROR_MALFORMED;
+         }
++#ifdef DLB_VISION
++    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
++        if (!track->meta.findData(kKeyDVCC, &type, &data, &size)
++                    || type != kTypeDVCC) {
++            return ERROR_MALFORMED;
++        }
++#endif
+     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG4)
+             || !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG2)
+             || !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
+@@ -4104,6 +4190,9 @@ MPEG4Source::MPEG4Source(
+       mIsAVC(false),
+       mIsHEVC(false),
+       mIsAC4(false),
++#ifdef DLB_VISION
++      mIsDolbyVision(false),
++#endif
+       mNALLengthSize(0),
+       mStarted(false),
+       mGroup(NULL),
+@@ -4138,6 +4227,9 @@ MPEG4Source::MPEG4Source(
+     mIsHEVC = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC) ||
+               !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
+     mIsAC4 = !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC4);
++#ifdef DLB_VISION
++    mIsDolbyVision = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION);
++#endif
+ 
+     if (mIsAVC) {
+         uint32_t type;
+@@ -4165,6 +4257,44 @@ MPEG4Source::MPEG4Source(
+ 
+         mNALLengthSize = 1 + (ptr[14 + 7] & 3);
+     }
++#ifdef DLB_VISION
++    else if (mIsDolbyVision) {
++        ALOGV("%s DolbyVision stream detected", __FUNCTION__);
++        uint32_t type;
++        const void *data;
++        size_t size;
++        CHECK(format.findData(kKeyDVCC, &type, &data, &size));
++
++        const uint8_t *ptr = (const uint8_t *)data;
++
++        CHECK(size == 24);
++        CHECK_EQ((unsigned)ptr[0], 1u);  // dv_major_version == 1
++        CHECK_EQ((unsigned)ptr[1], 0u);  // dv_minor_version == 0
++
++        const uint8_t profile = ptr[2] >> 1;
++        // profile == (0, 1, 9) --> AVC; profile = (2,3,4,5,6,7,8) --> HEVC;
++        if (profile > 1 &&  profile < 9) {
++            CHECK(format.findData(kKeyHVCC, &type, &data, &size));
++
++            const uint8_t *ptr = (const uint8_t *)data;
++
++            CHECK(size >= 22);
++            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
++
++            mNALLengthSize = 1 + (ptr[14 + 7] & 3);
++        } else {
++            CHECK(format.findData(kKeyAVCC, &type, &data, &size));
++
++            const uint8_t *ptr = (const uint8_t *)data;
++
++            CHECK(size >= 7);
++            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
++
++            // The number of bytes used to encode the length of a NAL unit.
++            mNALLengthSize = 1 + (ptr[4] & 3);
++        }
++    }
++#endif
+ 
+     CHECK(format.findInt32(kKeyTrackID, &mTrackId));
+ 
+@@ -5084,7 +5214,11 @@ status_t MPEG4Source::read(
+         }
+     }
+ 
+-    if ((!mIsAVC && !mIsHEVC && !mIsAC4) || mWantsNALFragments) {
++    if ((!mIsAVC
++#ifdef DLB_VISION
++        && !mIsDolbyVision
++#endif
++        && !mIsHEVC && !mIsAC4) || mWantsNALFragments) {
+         if (newBuffer) {
+             ssize_t num_bytes_read =
+                 mDataSource->readAt(offset, (uint8_t *)mBuffer->data(), size);
+@@ -5116,7 +5250,11 @@ status_t MPEG4Source::read(
+             ++mCurrentSampleIndex;
+         }
+ 
+-        if (!mIsAVC && !mIsHEVC && !mIsAC4) {
++        if (!mIsAVC
++#ifdef DLB_VISION
++          && !mIsDolbyVision
++#endif
++        && !mIsHEVC && !mIsAC4) {
+             *out = mBuffer;
+             mBuffer = NULL;
+ 
+@@ -5464,7 +5602,11 @@ status_t MPEG4Source::fragmentedRead(
+ 
+     }
+ 
+-    if ((!mIsAVC && !mIsHEVC)|| mWantsNALFragments) {
++    if ((!mIsAVC
++#ifdef DLB_VISION
++      && !mIsDolbyVision
++#endif
++      && !mIsHEVC)|| mWantsNALFragments) {
+         if (newBuffer) {
+             if (!isInRange((size_t)0u, mBuffer->size(), size)) {
+                 mBuffer->release();
+diff --git a/media/libmediaextractor/include/media/stagefright/MetaDataBase.h b/media/libmediaextractor/include/media/stagefright/MetaDataBase.h
+index dfe34e8..b6ae39b 100644
+--- a/media/libmediaextractor/include/media/stagefright/MetaDataBase.h
++++ b/media/libmediaextractor/include/media/stagefright/MetaDataBase.h
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2017 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ #ifndef META_DATA_BASE_H_
+ 
+@@ -59,6 +73,9 @@ enum {
+     kKeyAVCC              = 'avcc',  // raw data
+     kKeyHVCC              = 'hvcc',  // raw data
+     kKeyThumbnailHVCC     = 'thvc',  // raw data
++#ifdef DLB_VISION
++    kKeyDVCC              = 'dvcc',  // raw data
++#endif
+     kKeyD263              = 'd263',  // raw data
+     kKeyVorbisInfo        = 'vinf',  // raw data
+     kKeyVorbisBooks       = 'vboo',  // raw data
+@@ -231,6 +248,9 @@ enum {
+     kTypeESDS        = 'esds',
+     kTypeAVCC        = 'avcc',
+     kTypeHVCC        = 'hvcc',
++#ifdef DLB_VISION
++    kTypeDVCC        = 'dvcc',
++#endif
+     kTypeD263        = 'd263',
+ };
+ 
+diff --git a/media/libstagefright/Android.bp b/media/libstagefright/Android.bp
+index 2267c69..a2ff521 100644
+--- a/media/libstagefright/Android.bp
++++ b/media/libstagefright/Android.bp
+@@ -12,6 +12,7 @@ cc_library_static {
+     cflags: [
+         "-Werror",
+         "-Wall",
++        "-DDLB_VISION=1",
+     ],
+     sanitize: {
+         misc_undefined: [
+@@ -34,6 +35,7 @@ cc_library_static {
+     cflags: [
+         "-Werror",
+         "-Wall",
++        "-DDLB_VISION=1",
+     ],
+     sanitize: {
+         misc_undefined: [
+@@ -62,6 +64,7 @@ cc_library_shared {
+     cflags: [
+         "-Werror",
+         "-Wall",
++        "-DDLB_VISION=1",
+     ],
+ 
+     shared_libs: [
+@@ -207,6 +210,7 @@ cc_library_shared {
+         "-Werror",
+         "-Wno-error=deprecated-declarations",
+         "-Wall",
++        "-DDLB_VISION=1",
+     ],
+ 
+     version_script: "exports.lds",
+@@ -293,6 +297,7 @@ cc_library {
+         "-Werror",
+         "-Wno-error=deprecated-declarations",
+         "-Wall",
++        "-DDLB_VISION=1",
+         "-DSTAGEFRIGHT_PLAYER2"
+     ],
+ 
+diff --git a/media/libstagefright/HevcUtils.cpp b/media/libstagefright/HevcUtils.cpp
+index f152a38..81fee57 100644
+--- a/media/libstagefright/HevcUtils.cpp
++++ b/media/libstagefright/HevcUtils.cpp
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "HevcUtils"
+@@ -27,12 +41,22 @@
+ #include <media/stagefright/foundation/ADebug.h>
+ #include <media/stagefright/foundation/AMessage.h>
+ #include <media/stagefright/foundation/avc_utils.h>
++#ifdef DLB_VISION
++#include <media/stagefright/foundation/MediaDefs.h>
++#endif
+ #include <media/stagefright/MediaErrors.h>
+ #include <media/stagefright/Utils.h>
+ 
+ namespace android {
+ 
++#ifdef DLB_VISION
++static const uint8_t kHevcNalUnitTypes[8] = {
++    kHevcNalUnitTypeIDRw,
++    kHevcNalUnitTypeIDRn,
++    kHevcNalUnitTypeCRA,
++#else
+ static const uint8_t kHevcNalUnitTypes[5] = {
++#endif
+     kHevcNalUnitTypeVps,
+     kHevcNalUnitTypeSps,
+     kHevcNalUnitTypePps,
+@@ -40,6 +64,38 @@ static const uint8_t kHevcNalUnitTypes[5] = {
+     kHevcNalUnitTypeSuffixSei,
+ };
+ 
++#ifdef DLB_VISION
++bool IsHevcIDR(const sp<ABuffer> &buffer) {
++    const uint8_t *data = buffer->data();
++    size_t size = buffer->size();
++
++    if(data == NULL || size == 0) {
++        ALOGE("HEVC Nal data error");
++        return false;
++    }
++
++    bool flagIDR = false;
++    const uint8_t *nalStart;
++    size_t nalSize;
++    while (!flagIDR && getNextNALUnit(&data, &size, &nalStart, &nalSize, true) == OK) {
++        if (nalSize == 0) {
++            return false;
++        }
++
++        uint8_t nalUnitType = (nalStart[0] & 0x7e) >> 1;
++        if ( (nalUnitType == kHevcNalUnitTypeIDRw) ||
++             (nalUnitType == kHevcNalUnitTypeIDRn) ||
++             (nalUnitType == kHevcNalUnitTypeCRA) ) {
++            flagIDR = true;
++            break;
++        }
++    }
++
++    return flagIDR;
++}
++// Moved MakeHEVCCodecSpecificData to MetaDataUtils.cpp
++#endif
++
+ HevcParameterSets::HevcParameterSets()
+     : mInfo(kInfoNone) {
+ }
+diff --git a/media/libstagefright/MPEG4Writer.cpp b/media/libstagefright/MPEG4Writer.cpp
+index 6ff3d78..f755fe4 100644
+--- a/media/libstagefright/MPEG4Writer.cpp
++++ b/media/libstagefright/MPEG4Writer.cpp
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2017 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "MPEG4Writer"
+@@ -2146,6 +2160,10 @@ void MPEG4Writer::Track::getCodecSpecificDataFromInputFormatIfPossible() {
+     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC) ||
+                !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
+         mMeta->findData(kKeyHVCC, &type, &data, &size);
++#ifdef DLB_VISION
++    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
++        mMeta->findData(kKeyDVCC, &type, &data, &size);
++#endif
+     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG4)
+             || !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
+         if (mMeta->findData(kKeyESDS, &type, &data, &size)) {
+diff --git a/media/libstagefright/MetaDataUtils.cpp b/media/libstagefright/MetaDataUtils.cpp
+index 04f6ade..646ca22 100644
+--- a/media/libstagefright/MetaDataUtils.cpp
++++ b/media/libstagefright/MetaDataUtils.cpp
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "MetaDataUtils"
+@@ -24,6 +38,26 @@
+ 
+ namespace android {
+ 
++#ifdef DLB_VISION
++  sp<MetaData> MakeHEVCCodecSpecificData(const sp<ABuffer> &buffer) {
++      const uint8_t *data = buffer->data();
++      size_t size = buffer->size();
++
++      if(data == NULL || size == 0) {
++          return NULL;
++      }
++
++      sp<MetaData> meta = new MetaData;
++      meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
++
++      //Don't know the real dimension so far, just set it to QCIF...
++      meta->setInt32(kKeyWidth, 176);
++      meta->setInt32(kKeyHeight, 144);
++
++      return meta;
++  }
++#endif
++
+ bool MakeAVCCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size) {
+     int32_t width;
+     int32_t height;
+diff --git a/media/libstagefright/Utils.cpp b/media/libstagefright/Utils.cpp
+index a5cf94b..ffd7c98 100644
+--- a/media/libstagefright/Utils.cpp
++++ b/media/libstagefright/Utils.cpp
+@@ -12,6 +12,24 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
++ *
++ * This file was modified by Dolby Laboratories, Inc. The portions of the
++ * code that are surrounded by "DOLBY..." are copyrighted and
++ * licensed separately, as follows:
++ *
++ *  (C) 2017 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
+  */
+ 
+ //#define LOG_NDEBUG 0
+@@ -224,6 +242,75 @@ static void parseAvcProfileLevelFromAvcc(const uint8_t *ptr, size_t size, sp<AMe
+         }
+     }
+ }
++#ifdef DLB_VISION
++static void parseDolbyVisionProfileLevelFromDvcc(const uint8_t *ptr, size_t size, sp<AMessage> &format)
++{
++    if (size < 4 || ptr[0] != 1 || ptr[1] != 0) {  // dv_major_version == 1, dv_minor_version == 0
++        return;
++    }
++
++    const uint8_t profile = ptr[2] >> 1;
++    const uint8_t level = ((ptr[2] & 0x1) << 5) | ((ptr[3] >> 3) & 0x1f);
++    const uint8_t rpu_present_flag = (ptr[3] >> 2) & 0x01;
++    const uint8_t el_present_flag = (ptr[3] >> 1) & 0x01;
++    const uint8_t bl_present_flag = (ptr[3] & 0x01);
++
++
++    int32_t bl_compatibility_id = 0;
++    if (size == 4) {
++        bl_compatibility_id = (int32_t)(ptr[4] >> 4);
++    }
++
++    ALOGV("%s profile-level-compatibility value in dv(c|v)c box %d-%d-%d", __FUNCTION__,
++                                                profile, level, bl_compatibility_id);
++
++    ALOGV("%s profile-level value in dv(c|v)c box %d-%d", __FUNCTION__, profile, level);
++    /* All Dolby Profiles will have profile and level info in MediaFormat
++        Profile 8 and 9 will have bl_compatibility_id too.
++    */
++    const static ALookup<uint8_t, OMX_VIDEO_DOLBYVISIONPROFILETYPE> profiles {
++        { 1, OMX_VIDEO_DolbyVisionProfileDvavPen },
++        { 3, OMX_VIDEO_DolbyVisionProfileDvheDen },
++        { 4, OMX_VIDEO_DolbyVisionProfileDvheDtr },
++        { 5, OMX_VIDEO_DolbyVisionProfileDvheStn },
++        { 6, OMX_VIDEO_DolbyVisionProfileDvheDth },
++        { 7, OMX_VIDEO_DolbyVisionProfileDvheDtb },
++        { 8, OMX_VIDEO_DolbyVisionProfileDvheSt },
++        { 9, OMX_VIDEO_DolbyVisionProfileDvavSe },
++    };
++
++    const static ALookup<uint8_t, OMX_VIDEO_DOLBYVISIONLEVELTYPE> levels {
++        { 0, OMX_VIDEO_DolbyVisionLevelUnknown },
++        { 1, OMX_VIDEO_DolbyVisionLevelHd24 },
++        { 2, OMX_VIDEO_DolbyVisionLevelHd30 },
++        { 3, OMX_VIDEO_DolbyVisionLevelFhd24 },
++        { 4, OMX_VIDEO_DolbyVisionLevelFhd30 },
++        { 5, OMX_VIDEO_DolbyVisionLevelFhd60 },
++        { 6, OMX_VIDEO_DolbyVisionLevelUhd24 },
++        { 7, OMX_VIDEO_DolbyVisionLevelUhd30 },
++        { 8, OMX_VIDEO_DolbyVisionLevelUhd48 },
++        { 9, OMX_VIDEO_DolbyVisionLevelUhd60 },
++    };
++    //set rpuAssoc
++    if (rpu_present_flag && el_present_flag && !bl_present_flag)
++    {
++         format->setInt32("rpuAssoc", 1);
++    }
++    // set profile & level if they are recognized
++    OMX_VIDEO_DOLBYVISIONPROFILETYPE codecProfile;
++    OMX_VIDEO_DOLBYVISIONLEVELTYPE codecLevel;
++    if (profiles.map(profile, &codecProfile)) {
++        format->setInt32("profile", codecProfile);
++        if(codecProfile == OMX_VIDEO_DolbyVisionProfileDvheSt ||
++           codecProfile == OMX_VIDEO_DolbyVisionProfileDvavSe){
++            format->setInt32("bl_compatibility_id", bl_compatibility_id);
++        }
++        if (levels.map(level, &codecLevel)) {
++            format->setInt32("level", codecLevel);
++        }
++    }
++}
++#endif
+ 
+ static void parseH263ProfileLevelFromD263(const uint8_t *ptr, size_t size, sp<AMessage> &format) {
+     if (size < 7) {
+@@ -1090,7 +1177,13 @@ status_t convertMetaDataToMessage(
+ 
+         parseVp9ProfileLevelFromCsd(buffer, msg);
+     }
+-
++#ifdef DLB_VISION
++    if (meta->findData(kKeyDVCC, &type, &data, &size)) {
++        const uint8_t *ptr = (const uint8_t *)data;
++        ALOGV("%s DV: calling parseDolbyVisionProfileLevelFromDvcc", __FUNCTION__);
++        parseDolbyVisionProfileLevelFromDvcc(ptr, size, msg);
++    }
++#endif
+     // TODO expose "crypto-key"/kKeyCryptoKey through public api
+     if (meta->findData(kKeyCryptoKey, &type, &data, &size)) {
+         sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+@@ -1488,7 +1581,13 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
+             std::vector<uint8_t> hvcc(csd0size + 1024);
+             size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
+             meta->setData(kKeyHVCC, kKeyHVCC, hvcc.data(), outsize);
+-        } else if (mime == MEDIA_MIMETYPE_VIDEO_VP9) {
++#ifdef DLB_VISION
++        } else if (mime ==  MEDIA_MIMETYPE_VIDEO_DOLBY_VISION) {
++            uint8_t dvcc[1024];
++            size_t outsize = reassembleHVCC(csd0, dvcc, 1024, 4);
++            meta->setData(kKeyDVCC, kKeyDVCC, dvcc, outsize);
++#endif
++        }  else if (mime == MEDIA_MIMETYPE_VIDEO_VP9) {
+             meta->setData(kKeyVp9CodecPrivate, 0, csd0->data(), csd0->size());
+         } else if (mime == MEDIA_MIMETYPE_AUDIO_OPUS) {
+             meta->setData(kKeyOpusHeader, 0, csd0->data(), csd0->size());
+diff --git a/media/libstagefright/httplive/Android.bp b/media/libstagefright/httplive/Android.bp
+index 8a77401..dcdb61f 100644
+--- a/media/libstagefright/httplive/Android.bp
++++ b/media/libstagefright/httplive/Android.bp
+@@ -17,6 +17,7 @@ cc_library {
+     cflags: [
+         "-Werror",
+         "-Wall",
++        "-DDLB_VISION=1"
+     ],
+ 
+     sanitize: {
+diff --git a/media/libstagefright/httplive/M3UParser.cpp b/media/libstagefright/httplive/M3UParser.cpp
+index 8ab33f7..015d1dd 100644
+--- a/media/libstagefright/httplive/M3UParser.cpp
++++ b/media/libstagefright/httplive/M3UParser.cpp
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "M3UParser"
+@@ -1409,6 +1423,12 @@ bool M3UParser::codecIsType(const AString &codec, const char *type) {
+         case 'CFHD':
+         case 'civd':
+         case 'DV10':
++#ifdef DLB_VISION
++        case 'dva1':
++        case 'dvav':
++        case 'dvh1':
++        case 'dvhe':
++#endif
+         case 'dvh5':
+         case 'dvh6':
+         case 'dvhp':
+@@ -1418,9 +1438,15 @@ bool M3UParser::codecIsType(const AString &codec, const char *type) {
+         case 'DVVT':
+         case 'flic':
+         case 'gif ':
++#ifdef DLB_VISION
++        case 'hev1':
++#endif
+         case 'h261':
+         case 'h263':
+         case 'HD10':
++#ifdef DLB_VISION
++        case 'hvc1':
++#endif
+         case 'jpeg':
+         case 'M105':
+         case 'mjpa':
+diff --git a/media/libstagefright/httplive/PlaylistFetcher.cpp b/media/libstagefright/httplive/PlaylistFetcher.cpp
+index 9f39b5e..49f5611 100644
+--- a/media/libstagefright/httplive/PlaylistFetcher.cpp
++++ b/media/libstagefright/httplive/PlaylistFetcher.cpp
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "PlaylistFetcher"
+@@ -24,6 +38,9 @@
+ #include "LiveSession.h"
+ #include "M3UParser.h"
+ #include "include/ID3.h"
++#ifdef DLB_VISION
++#include "include/HevcUtils.h"
++#endif
+ #include "mpeg2ts/AnotherPacketSource.h"
+ #include "mpeg2ts/HlsSampleDecryptor.h"
+ 
+@@ -1820,9 +1837,21 @@ status_t PlaylistFetcher::extractAndQueueAccessUnitsFromTs(const sp<ABuffer> &bu
+ 
+         const char *mime;
+         sp<MetaData> format  = source->getFormat();
++#ifdef DLB_VISION
++        bool isAvc = false;
++        bool isHevc = false;
++
++        if(format != NULL && format->findCString(kKeyMIMEType, &mime)) {
++            if(!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
++                isAvc = true;
++            } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
++                isHevc = true;
++            }
++        }
++#else
+         bool isAvc = format != NULL && format->findCString(kKeyMIMEType, &mime)
+                 && !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
+-
++#endif
+         sp<ABuffer> accessUnit;
+         status_t finalResult;
+         while (source->hasBufferAvailable(&finalResult)
+@@ -1853,6 +1882,19 @@ status_t PlaylistFetcher::extractAndQueueAccessUnitsFromTs(const sp<ABuffer> &bu
+                             FSLOGV(stream, "saving AVC video AccessUnit");
+                         }
+                     }
++#ifdef DLB_VISION
++                     else if (isHevc){
++                       if (IsHevcIDR(accessUnit)) {
++                            mVideoBuffer->clear();
++                            FSLOGV(stream, "found IDR, clear mVideoBuffer");
++                            mIDRFound = true;
++                        }
++                        if (mIDRFound && mStartTimeUsRelative && !startTimeReached) {
++                            mVideoBuffer->queueAccessUnit(accessUnit);
++                            FSLOGV(stream, "saving HEVC video AccessUnit");
++                        }
++                     }
++#endif
+                     if (!startTimeReached || (isAvc && !mIDRFound)) {
+                         continue;
+                     }
+diff --git a/media/libstagefright/include/HevcUtils.h b/media/libstagefright/include/HevcUtils.h
+index 0f59631..25e8e98 100644
+--- a/media/libstagefright/include/HevcUtils.h
++++ b/media/libstagefright/include/HevcUtils.h
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ #ifndef HEVC_UTILS_H_
+ 
+@@ -30,6 +44,11 @@
+ namespace android {
+ 
+ enum {
++#ifdef DLB_VISION
++    kHevcNalUnitTypeIDRw = 19,
++    kHevcNalUnitTypeIDRn = 20,
++    kHevcNalUnitTypeCRA  = 21,
++#endif
+     kHevcNalUnitTypeVps = 32,
+     kHevcNalUnitTypeSps = 33,
+     kHevcNalUnitTypePps = 34,
+@@ -66,6 +85,10 @@ enum {
+     kMatrixCoeffs,
+ };
+ 
++#ifdef DLB_VISION
++bool IsHevcIDR(const sp<ABuffer> &buffer);
++#endif
++
+ class HevcParameterSets {
+ public:
+     enum Info : uint32_t {
+diff --git a/media/libstagefright/include/media/stagefright/MetaDataUtils.h b/media/libstagefright/include/media/stagefright/MetaDataUtils.h
+index d5a8080..ce49c6e 100644
+--- a/media/libstagefright/include/media/stagefright/MetaDataUtils.h
++++ b/media/libstagefright/include/media/stagefright/MetaDataUtils.h
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ #ifndef META_DATA_UTILS_H_
+ 
+@@ -26,7 +40,9 @@ struct ABuffer;
+ bool MakeAVCCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size);
+ bool MakeAACCodecSpecificData(MetaDataBase &meta, unsigned profile, unsigned sampling_freq_index,
+         unsigned channel_configuration);
+-
++#ifdef DLB_VISION
++sp<MetaData> MakeHEVCCodecSpecificData(const sp<ABuffer> &buffer);
++#endif
+ }  // namespace android
+ 
+ #endif  // META_DATA_UTILS_H_
+diff --git a/media/libstagefright/mpeg2ts/ATSParser.cpp b/media/libstagefright/mpeg2ts/ATSParser.cpp
+index 4927a2e..2970a2d 100644
+--- a/media/libstagefright/mpeg2ts/ATSParser.cpp
++++ b/media/libstagefright/mpeg2ts/ATSParser.cpp
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "ATSParser"
+@@ -35,6 +49,9 @@
+ #include <media/stagefright/foundation/ByteUtils.h>
+ #include <media/stagefright/foundation/MediaKeys.h>
+ #include <media/stagefright/foundation/avc_utils.h>
++#ifdef DLB_VISION
++#include "include/HevcUtils.h"
++#endif
+ #include <media/stagefright/foundation/hexdump.h>
+ #include <media/stagefright/MediaDefs.h>
+ #include <media/stagefright/MediaErrors.h>
+@@ -115,6 +132,11 @@ struct ATSParser::Program : public RefBase {
+     void updateCasSessions();
+ 
+     void signalNewSampleAesKey(const sp<AMessage> &keyItem);
++#ifdef DLB_VISION
++    void setDoViFlag(bool flag);
++    bool isDoVi();
++    void getDoViDescriptor(uint8_t *data);
++#endif
+ 
+ private:
+     struct StreamInfo {
+@@ -128,6 +150,9 @@ private:
+     unsigned mProgramNumber;
+     unsigned mProgramMapPID;
+     KeyedVector<unsigned, sp<Stream> > mStreams;
++#ifdef DLB_VISION
++    bool mDoVi;
++#endif
+     bool mFirstPTSValid;
+     uint64_t mFirstPTS;
+     int64_t mLastRecoveredPTS;
+@@ -136,9 +161,17 @@ private:
+     status_t parseProgramMap(ABitReader *br);
+     int64_t recoverPTS(uint64_t PTS_33bit);
+     bool findCADescriptor(
+-            ABitReader *br, unsigned infoLength, CADescriptor *caDescriptor);
++#ifdef DLB_VISION
++            ABitReader *br, unsigned infoLength, CADescriptor *caDescriptor,
++            unsigned *pStreamTypeExt);
++#else
++       ABitReader *br, unsigned infoLength, CADescriptor *caDescriptor);
++#endif
+     bool switchPIDs(const Vector<StreamInfo> &infos);
+ 
++#ifdef DLB_VISION
++    uint8_t mDoViDescriptor[5];
++#endif
+     DISALLOW_EVIL_CONSTRUCTORS(Program);
+ };
+ 
+@@ -303,12 +336,28 @@ ATSParser::Program::Program(
+     : mParser(parser),
+       mProgramNumber(programNumber),
+       mProgramMapPID(programMapPID),
++#ifdef DLB_VISION
++      mDoVi(false),
++#endif
+       mFirstPTSValid(false),
+       mFirstPTS(0),
+       mLastRecoveredPTS(lastRecoveredPTS) {
+     ALOGV("new program number %u", programNumber);
+ }
+ 
++#ifdef DLB_VISION
++void ATSParser::Program::setDoViFlag(bool flag) {
++    mDoVi = flag;
++}
++
++bool ATSParser::Program::isDoVi() {
++    return mDoVi;
++}
++void ATSParser::Program::getDoViDescriptor(uint8_t *data) {
++    memcpy(data, mDoViDescriptor, 5);
++}
++#endif
++
+ bool ATSParser::Program::parsePSISection(
+         unsigned pid, ABitReader *br, status_t *err) {
+     *err = OK;
+@@ -438,7 +487,11 @@ bool ATSParser::Program::switchPIDs(const Vector<StreamInfo> &infos) {
+ 
+ bool ATSParser::Program::findCADescriptor(
+         ABitReader *br, unsigned infoLength,
+-        ATSParser::CADescriptor *caDescriptor) {
++#ifdef DLB_VISION
++        ATSParser::CADescriptor *caDescriptor, unsigned *pStreamTypeExt) {
++#else
++         ATSParser::CADescriptor *caDescriptor) {
++#endif
+     bool found = false;
+     while (infoLength > 2) {
+         unsigned descriptor_tag = br->getBits(8);
+@@ -459,7 +512,19 @@ bool ATSParser::Program::findCADescriptor(
+             caDescriptor->mPrivateData.assign(
+                     br->data(), br->data() + descriptor_length - 4);
+             break;
+-        } else {
++        }
++#ifdef DLB_VISION
++         else if (pStreamTypeExt != NULL && descriptor_tag == STREAMTYPE_EXT_DOVI) {
++            ALOGV("find dovi descriptor ...");
++            setDoViFlag(true);
++            *pStreamTypeExt = STREAMTYPE_EXT_DOVI;
++            memcpy(mDoViDescriptor, br->data(), descriptor_length);
++            infoLength -= descriptor_length;
++            br->skipBits(descriptor_length * 8);
++            break;
++         }
++#endif
++        else {
+             infoLength -= descriptor_length;
+             br->skipBits(descriptor_length * 8);
+         }
+@@ -506,7 +571,11 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
+ 
+     // descriptors
+     CADescriptor programCA;
+-    bool hasProgramCA = findCADescriptor(br, program_info_length, &programCA);
++#ifdef DLB_VISION
++    bool hasProgramCA = findCADescriptor(br, program_info_length, &programCA,NULL);
++#else
++     bool hasProgramCA = findCADescriptor(br, program_info_length, &programCA);
++#endif //DOLBY_VISION_END
+     if (hasProgramCA && !mParser->mCasManager->addProgram(
+             mProgramNumber, programCA)) {
+         return ERROR_MALFORMED;
+@@ -564,7 +633,20 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
+                 ES_info_length -= descriptor_length;
+                 descriptor_length--;
+                 br->skipBits(descriptor_length * 8);
+-            } else {
++            } 
++#ifdef DLB_VISION
++            else if (info.mType == STREAMTYPE_PES_PRIVATE_DATA &&
++			         descriptor_tag == STREAMTYPE_EXT_DOVI && descriptor_length >= 1) {
++                ALOGV("find dovi descriptor ...");
++                setDoViFlag(true);
++                info.mTypeExt = STREAMTYPE_EXT_DOVI;
++                memcpy(mDoViDescriptor, br->data(), descriptor_length);
++                ES_info_length -= descriptor_length;
++                br->skipBits(descriptor_length * 8);
++                break;
++            }
++#endif			
++     		else {
+                 ES_info_length -= descriptor_length;
+                 br->skipBits(descriptor_length * 8);
+             }
+@@ -785,7 +867,16 @@ ATSParser::Stream::Stream(
+     switch (mStreamType) {
+         case STREAMTYPE_H264:
+         case STREAMTYPE_H264_ENCRYPTED:
+-            mode = ElementaryStreamQueue::H264;
++#ifdef DLB_VISION
++            if(mProgram->isDoVi())
++            {
++                mode = ElementaryStreamQueue::DOVI;
++            } else {
++                mode = ElementaryStreamQueue::H264;
++            }
++#else
++             mode = ElementaryStreamQueue::H264;
++#endif
+             flags |= (mProgram->parserFlags() & ALIGNED_VIDEO_DATA) ?
+                     ElementaryStreamQueue::kFlag_AlignedData : 0;
+             break;
+@@ -818,11 +909,31 @@ ATSParser::Stream::Stream(
+         case STREAMTYPE_EAC3:
+             mode = ElementaryStreamQueue::EAC3;
+             break;
+-
++#ifdef DLB_VISION
++        case STREAMTYPE_H265:
++            if(mProgram->isDoVi())
++            {
++                mode = ElementaryStreamQueue::DOVI;
++            } else {
++                mode = ElementaryStreamQueue::H265;
++            }
++            flags |= (mProgram->parserFlags() & ALIGNED_VIDEO_DATA) ?
++                    ElementaryStreamQueue::kFlag_AlignedData : 0;
++            break;
++#endif
+         case STREAMTYPE_PES_PRIVATE_DATA:
+             if (mStreamTypeExt == EXT_DESCRIPTOR_DVB_AC4) {
+                 mode = ElementaryStreamQueue::AC4;
+             }
++#ifdef DLB_VISION
++			if(mStreamTypeExt == STREAMTYPE_EXT_DOVI) {
++                mode = ElementaryStreamQueue::DOVI;
++                ALOGV("DoVi stream type found!");
++            }else
++            {
++                ALOGE("Gone Wrong with STREAMTYPE_PES_PRIVATE_DATA");
++            }
++#endif
+             break;
+ 
+         case STREAMTYPE_METADATA:
+@@ -843,7 +954,13 @@ ATSParser::Stream::Stream(
+         }
+ 
+         ensureBufferCapacity(kInitialStreamBufferSize);
+-
++#ifdef DLB_VISION
++        if (mode == ElementaryStreamQueue::DOVI) {
++            uint8_t data[5] = {0,};
++            mProgram->getDoViDescriptor(data);
++            mQueue->setDoViDescriptor(data);
++        }
++#endif
+         if (mScrambled && (isAudio() || isVideo())) {
+             // Set initial format to scrambled
+             sp<MetaData> meta = new MetaData();
+@@ -1016,8 +1133,17 @@ bool ATSParser::Stream::isVideo() const {
+         case STREAMTYPE_MPEG1_VIDEO:
+         case STREAMTYPE_MPEG2_VIDEO:
+         case STREAMTYPE_MPEG4_VIDEO:
++#ifdef DLB_VISION
++        case STREAMTYPE_H265:
++          ALOGV("stream type is: %d", mStreamType);
++#endif
+             return true;
+ 
++#ifdef DLB_VISION
++        case STREAMTYPE_PES_PRIVATE_DATA:
++          ALOGV("stream type is: %d", mStreamType);
++          return mStreamTypeExt == STREAMTYPE_EXT_DOVI? true : false;
++#endif
+         default:
+             return false;
+     }
+diff --git a/media/libstagefright/mpeg2ts/ATSParser.h b/media/libstagefright/mpeg2ts/ATSParser.h
+index a31dc46..1cf9c60 100644
+--- a/media/libstagefright/mpeg2ts/ATSParser.h
++++ b/media/libstagefright/mpeg2ts/ATSParser.h
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ #ifndef A_TS_PARSER_H_
+ 
+@@ -147,7 +161,9 @@ struct ATSParser : public RefBase {
+         STREAMTYPE_MPEG4_VIDEO          = 0x10,
+         STREAMTYPE_METADATA             = 0x15,
+         STREAMTYPE_H264                 = 0x1b,
+-
++#ifdef DLB_VISION
++        STREAMTYPE_H265                 = 0x24,
++#endif
+         // From ATSC A/53 Part 3:2009, 6.7.1
+         STREAMTYPE_AC3                  = 0x81,
+ 
+@@ -161,7 +177,14 @@ struct ATSParser : public RefBase {
+         STREAMTYPE_AAC_ENCRYPTED        = 0xCF,
+         STREAMTYPE_AC3_ENCRYPTED        = 0xC1,
+     };
+-
++#ifdef DLB_VISION
++    enum {
++        STREAMTYPE_EXT_RESERVED         = 0x00,
++        //this is not actual stream-type
++        // this is to signal dolby vision descriptor
++        STREAMTYPE_EXT_DOVI              = 0xB0,
++    };
++#endif // DOLBY_END
+     enum {
+         // From ISO/IEC 13818-1: 2007 (E), Table 2-29
+         DESCRIPTOR_CA                   = 0x09,
+diff --git a/media/libstagefright/mpeg2ts/Android.bp b/media/libstagefright/mpeg2ts/Android.bp
+index fbf1496..49378d9 100644
+--- a/media/libstagefright/mpeg2ts/Android.bp
++++ b/media/libstagefright/mpeg2ts/Android.bp
+@@ -17,6 +17,7 @@ cc_library_static {
+     cflags: [
+         "-Werror",
+         "-Wall",
++        "-DDLB_VISION=1"
+     ],
+ 
+     sanitize: {
+diff --git a/media/libstagefright/mpeg2ts/ESQueue.cpp b/media/libstagefright/mpeg2ts/ESQueue.cpp
+index 1644a79..dbda741 100644
+--- a/media/libstagefright/mpeg2ts/ESQueue.cpp
++++ b/media/libstagefright/mpeg2ts/ESQueue.cpp
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "ESQueue"
+@@ -26,6 +40,9 @@
+ #include <media/stagefright/foundation/AMessage.h>
+ #include <media/stagefright/foundation/ByteUtils.h>
+ #include <media/stagefright/foundation/avc_utils.h>
++#ifdef DLB_VISION
++#include "include/HevcUtils.h"
++#endif
+ #include <media/stagefright/MediaErrors.h>
+ #include <media/stagefright/MediaDefs.h>
+ #include <media/stagefright/MetaData.h>
+@@ -56,6 +73,22 @@ ElementaryStreamQueue::ElementaryStreamQueue(Mode mode, uint32_t flags)
+ sp<MetaData> ElementaryStreamQueue::getFormat() {
+     return mFormat;
+ }
++#ifdef DLB_VISION
++void ElementaryStreamQueue::setDoViDescriptor(const uint8_t *data) {
++    memcpy(mDoviDescriptor, data, 5);
++}
++void ElementaryStreamQueue::sendDoViDescriptor() {
++    if (mFormat == NULL) {
++        mFormat = new MetaData;
++    }
++    mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION);
++    //Set the fake width/height...
++    mFormat->setInt32(kKeyWidth, 1280);
++    mFormat->setInt32(kKeyHeight, 720);
++    mFormat->setData(kKeyDVCC, kTypeDVCC, mDoviDescriptor, 5);
++
++}
++#endif
+ 
+ void ElementaryStreamQueue::clear(bool clearFormat) {
+     if (mBuffer != NULL) {
+@@ -442,6 +475,10 @@ status_t ElementaryStreamQueue::appendData(
+     if (mBuffer == NULL || mBuffer->size() == 0) {
+         switch (mMode) {
+             case H264:
++#ifdef DLB_VISION
++            case H265:
++            case DOVI:
++#endif
+             case MPEG_VIDEO:
+             {
+ #if 0
+@@ -818,7 +855,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
+ }
+ 
+ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
++#ifdef DLB_VISION
++    if (((mFlags & kFlag_AlignedData) && mMode == H264 && !isScrambled()) || mMode == H265 || mMode == DOVI) {
++#else
+     if ((mFlags & kFlag_AlignedData) && mMode == H264 && !isScrambled()) {
++#endif
+         if (mRangeInfos.empty()) {
+             return NULL;
+         }
+@@ -837,10 +878,24 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
+         mBuffer->setRange(0, mBuffer->size() - info.mLength);
+ 
+         if (mFormat == NULL) {
+-            mFormat = new MetaData;
++          mFormat = new MetaData;
++#ifdef DLB_VISION
++          if (mMode == H264) {
+             if (!MakeAVCCodecSpecificData(*mFormat, accessUnit->data(), accessUnit->size())) {
+                 mFormat.clear();
+             }
++          } else if (mMode == H265) {
++              ALOGV("find h265");
++              mFormat = MakeHEVCCodecSpecificData(accessUnit);
++          } else if (mMode == DOVI) {
++              ALOGV("find dovi");
++              sendDoViDescriptor();
++          }
++#else
++            if (!MakeAVCCodecSpecificData(*mFormat, accessUnit->data(), accessUnit->size())) {
++                mFormat.clear();
++            }
++#endif
+         }
+ 
+         return accessUnit;
+@@ -849,6 +904,12 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
+     switch (mMode) {
+         case H264:
+             return dequeueAccessUnitH264();
++#ifdef DLB_VISION
++        case H265:
++            return dequeueAccessUnitH265();
++        case DOVI:
++            return dequeueAccessUnitDoVi();
++#endif
+         case AAC:
+             return dequeueAccessUnitAAC();
+         case AC3:
+@@ -1487,7 +1548,17 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
+ 
+     return NULL;
+ }
++#ifdef DLB_VISION
++sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitDoVi() {
++    ALOGE("dequeue DoVi: should not be here");
++    return NULL;
++}
+ 
++sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH265() {
++    ALOGE("dequeue h265: should not be here");
++    return NULL;
++}
++#endif
+ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGAudio() {
+     const uint8_t *data = mBuffer->data();
+     size_t size = mBuffer->size();
+diff --git a/media/libstagefright/mpeg2ts/ESQueue.h b/media/libstagefright/mpeg2ts/ESQueue.h
+index 8c1d112..2fb70ae 100644
+--- a/media/libstagefright/mpeg2ts/ESQueue.h
++++ b/media/libstagefright/mpeg2ts/ESQueue.h
+@@ -12,7 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
++ *  (C) 2018 Dolby Laboratories, Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++*/
+ 
+ #ifndef ES_QUEUE_H_
+ 
+@@ -36,6 +50,10 @@ struct ElementaryStreamQueue {
+     enum Mode {
+         INVALID = 0,
+         H264,
++#ifdef DLB_VISION
++        H265,
++        DOVI,
++#endif
+         AAC,
+         AC3,
+         EAC3,
+@@ -77,6 +95,11 @@ struct ElementaryStreamQueue {
+ 
+     void signalNewSampleAesKey(const sp<AMessage> &keyItem);
+ 
++#ifdef DLB_VISION
++    void setDoViDescriptor(const uint8_t *data);
++    void sendDoViDescriptor();
++#endif
++
+ private:
+     struct RangeInfo {
+         int64_t mTimestampUs;
+@@ -116,6 +139,10 @@ private:
+     }
+ 
+     sp<ABuffer> dequeueAccessUnitH264();
++#ifdef DLB_VISION
++    sp<ABuffer> dequeueAccessUnitH265();
++    sp<ABuffer> dequeueAccessUnitDoVi();
++#endif
+     sp<ABuffer> dequeueAccessUnitAAC();
+     sp<ABuffer> dequeueAccessUnitEAC3();
+     sp<ABuffer> dequeueAccessUnitAC4();
+@@ -133,6 +160,10 @@ private:
+ 
+     sp<ABuffer> dequeueScrambledAccessUnit();
+ 
++#ifdef DLB_VISION
++  uint8_t mDoviDescriptor[5];
++#endif
++
+     DISALLOW_EVIL_CONSTRUCTORS(ElementaryStreamQueue);
+ };
+ 
+diff --git a/media/libstagefright/omx/Android.bp b/media/libstagefright/omx/Android.bp
+index 3e6942b..3142a88 100644
+--- a/media/libstagefright/omx/Android.bp
++++ b/media/libstagefright/omx/Android.bp
+@@ -70,6 +70,7 @@ cc_library_shared {
+         "-Wall",
+         "-Wno-unused-parameter",
+         "-Wno-documentation",
++        "-DDLB_VISION=1",
+     ],
+ 
+     sanitize: {
+@@ -118,7 +119,7 @@ cc_library_shared {
+             cfi: true,
+         },
+     },
+-    cflags: ["-Wall", "-Werror"],
++    cflags: ["-Wall", "-Werror", "-DDLB_VISION=1"],
+ }
+ 
+ //###############################################################################
+-- 
+1.9.1
+
