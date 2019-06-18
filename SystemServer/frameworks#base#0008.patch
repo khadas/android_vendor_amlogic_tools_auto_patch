@@ -1,83 +1,62 @@
-From af2fb660df4e1a8cef0621ceccd30c72529bb3c9 Mon Sep 17 00:00:00 2001
-From: shubang <shubang@google.com>
-Date: Fri, 9 Nov 2018 17:03:46 -0800
-Subject: [PATCH] Fix ConcurrentModificationException in TvInputManagerService
+From 160970fc46718260da21bac5293586f40a523510 Mon Sep 17 00:00:00 2001
+From: Jason Monk <jmonk@google.com>
+Date: Tue, 3 Jul 2018 11:21:57 -0400
+Subject: [PATCH] Fix how we get provider pkgs
 
-Bug: 116538734
-Test: m
-Change-Id: Ieb715b2a7b9ff54f543d79881dc0c910a310a26c
-(cherry picked from commit 0854b7d6807e39d99804944e2ad824b023a1f31d)
+Bug: 110985973
+Test: all existing tests pass (including high level supportlib ones)
+Change-Id: I6b37ef419e3c76f35912f84500f88c069b7505ac
+(cherry picked from commit 664af785d5b4399ff9b633f3e1aaa99ef44523c2)
 ---
- .../android/server/tv/TvInputManagerService.java   | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+ .../android/server/slice/SliceManagerService.java  | 26 ++++------------------
+ 1 file changed, 4 insertions(+), 22 deletions(-)
 
-diff --git a/services/core/java/com/android/server/tv/TvInputManagerService.java b/services/core/java/com/android/server/tv/TvInputManagerService.java
-index d5e59c8..1163d39 100644
---- a/services/core/java/com/android/server/tv/TvInputManagerService.java
-+++ b/services/core/java/com/android/server/tv/TvInputManagerService.java
-@@ -626,7 +626,7 @@ public final class TvInputManagerService extends SystemService {
-         updateServiceConnectionLocked(serviceState.component, userId);
-     }
- 
--    private void createSessionInternalLocked(ITvInputService service, IBinder sessionToken,
-+    private boolean createSessionInternalLocked(ITvInputService service, IBinder sessionToken,
-             int userId) {
-         UserState userState = getOrCreateUserStateLocked(userId);
-         SessionState sessionState = userState.sessionStateMap.get(sessionToken);
-@@ -638,6 +638,7 @@ public final class TvInputManagerService extends SystemService {
-         // Set up a callback to send the session token.
-         ITvInputSessionCallback callback = new SessionCallback(sessionState, channels);
- 
-+        boolean created = true;
-         // Create a session. When failed, send a null token immediately.
+diff --git a/services/core/java/com/android/server/slice/SliceManagerService.java b/services/core/java/com/android/server/slice/SliceManagerService.java
+index c3b9841..e8f255f 100644
+--- a/services/core/java/com/android/server/slice/SliceManagerService.java
++++ b/services/core/java/com/android/server/slice/SliceManagerService.java
+@@ -42,6 +42,7 @@ import android.content.Intent;
+ import android.content.IntentFilter;
+ import android.content.pm.PackageManager;
+ import android.content.pm.PackageManagerInternal;
++import android.content.pm.ProviderInfo;
+ import android.content.pm.ResolveInfo;
+ import android.net.Uri;
+ import android.os.Binder;
+@@ -395,30 +396,11 @@ public class SliceManagerService extends ISliceManager.Stub {
+     private String getProviderPkg(Uri uri, int user) {
+         long ident = Binder.clearCallingIdentity();
          try {
-             if (sessionState.isRecordingSession) {
-@@ -647,11 +648,12 @@ public final class TvInputManagerService extends SystemService {
-             }
-         } catch (RemoteException e) {
-             Slog.e(TAG, "error in createSession", e);
--            removeSessionStateLocked(sessionToken, userId);
-             sendSessionTokenToClientLocked(sessionState.client, sessionState.inputId, null,
-                     null, sessionState.seq);
-+            created = false;
+-            IBinder token = new Binder();
+-            IActivityManager activityManager = ActivityManager.getService();
+-            ContentProviderHolder holder = null;
+             String providerName = getUriWithoutUserId(uri).getAuthority();
+-            try {
+-                try {
+-                    holder = activityManager.getContentProviderExternal(
+-                            providerName, getUserIdFromUri(uri, user), token);
+-                    if (holder != null && holder.info != null) {
+-                        return holder.info.packageName;
+-                    } else {
+-                        return null;
+-                    }
+-                } finally {
+-                    if (holder != null && holder.provider != null) {
+-                        activityManager.removeContentProviderExternal(providerName, token);
+-                    }
+-                }
+-            } catch (RemoteException e) {
+-                // Can't happen.
+-                throw e.rethrowAsRuntimeException();
+-            }
++            ProviderInfo provider = mContext.getPackageManager().resolveContentProviderAsUser(
++                    providerName, 0, getUserIdFromUri(uri, user));
++            return provider.packageName;
+         } finally {
+-            // I know, the double finally seems ugly, but seems safest for the identity.
+             Binder.restoreCallingIdentity(ident);
          }
-         channels[1].dispose();
-+        return created;
      }
- 
-     private void sendSessionTokenToClientLocked(ITvInputClient client, String inputId,
-@@ -1193,8 +1195,10 @@ public final class TvInputManagerService extends SystemService {
-                     serviceState.sessionTokens.add(sessionToken);
- 
-                     if (serviceState.service != null) {
--                        createSessionInternalLocked(serviceState.service, sessionToken,
--                                resolvedUserId);
-+                        if (!createSessionInternalLocked(serviceState.service, sessionToken,
-+                                resolvedUserId)) {
-+                            removeSessionStateLocked(sessionToken, resolvedUserId);
-+                        }
-                     } else {
-                         updateServiceConnectionLocked(info.getComponent(), resolvedUserId);
-                     }
-@@ -2282,9 +2286,17 @@ public final class TvInputManagerService extends SystemService {
-                     }
-                 }
- 
-+                List<IBinder> tokensToBeRemoved = new ArrayList<>();
-+
-                 // And create sessions, if any.
-                 for (IBinder sessionToken : serviceState.sessionTokens) {
--                    createSessionInternalLocked(serviceState.service, sessionToken, mUserId);
-+                    if (!createSessionInternalLocked(serviceState.service, sessionToken, mUserId)) {
-+                        tokensToBeRemoved.add(sessionToken);
-+                    }
-+                }
-+
-+                for (IBinder sessionToken : tokensToBeRemoved) {
-+                    removeSessionStateLocked(sessionToken, mUserId);
-                 }
- 
-                 for (TvInputState inputState : userState.inputMap.values()) {
 -- 
-2.7.4
+1.9.1
 
