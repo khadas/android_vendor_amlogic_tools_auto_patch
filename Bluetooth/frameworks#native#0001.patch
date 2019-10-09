@@ -1,0 +1,40 @@
+From 6621a547c2748facf282f3ebd2021f29c90de8d7 Mon Sep 17 00:00:00 2001
+From: "qiu.zeng" <qiu.zeng@amlogic.com>
+Date: Wed, 9 Oct 2019 11:16:31 +0800
+Subject: [PATCH] BT: add app button and number button [1/3]
+
+Change-Id: I1282aa05ed11edd715fb45bdb15caf4d901a434e
+Signed-off-by: qiu.zeng <qiu.zeng@amlogic.com>
+---
+ include/android/keycodes.h       | 2 ++
+ include/input/InputEventLabels.h | 1 +
+ 2 files changed, 3 insertions(+)
+
+diff --git a/include/android/keycodes.h b/include/android/keycodes.h
+index 87f5459..095ef44 100644
+--- a/include/android/keycodes.h
++++ b/include/android/keycodes.h
+@@ -770,6 +770,8 @@ enum {
+     AKEYCODE_ALL_APPS = 284,
+     /** refresh key */
+     AKEYCODE_REFRESH = 285,
++    /** youtube */
++    AKEYCODE_YOUTUBE = 286,
+     /**droidlogic add key define:start.*/
+     AKEYCODE_TV_SHORTCUTKEY_GLOBALSETUP = 2001,
+     AKEYCODE_TV_SHORTCUTKEY_SOURCE_LIST = 2002,
+diff --git a/include/input/InputEventLabels.h b/include/input/InputEventLabels.h
+index 49e5306..c4469c4 100644
+--- a/include/input/InputEventLabels.h
++++ b/include/input/InputEventLabels.h
+@@ -325,6 +325,7 @@ static const InputEventLabel KEYCODES[] = {
+     DEFINE_KEYCODE(SYSTEM_NAVIGATION_RIGHT),
+     DEFINE_KEYCODE(ALL_APPS),
+     DEFINE_KEYCODE(REFRESH),
++    DEFINE_KEYCODE(YOUTUBE),
+     /**droidlogic add key define:start*/
+     DEFINE_KEYCODE(TV_SHORTCUTKEY_GLOBALSETUP),
+     DEFINE_KEYCODE(TV_SHORTCUTKEY_SOURCE_LIST),
+-- 
+1.9.1
+
