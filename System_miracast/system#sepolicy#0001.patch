@@ -1,4 +1,4 @@
-From 24f5b39b3a8cc36fc12a35831bdaeb36a42bd8e4 Mon Sep 17 00:00:00 2001
+From ddda4f8dc8603fc5a6b267470599c69f11d7b602 Mon Sep 17 00:00:00 2001
 From: "shipeng.sun" <shipeng.sun@amlogic.com>
 Date: Tue, 2 Apr 2019 10:21:49 +0800
 Subject: [PATCH] sepolicy: Modify dnsmsq sepolicy for miracast [1/1]
@@ -16,21 +16,6 @@ Verify on darwin
 
 Change-Id: If62c4e1643a2cbf156117f77ea7d1befe45c66d4
 Signed-off-by: shipeng.sun <shipeng.sun@amlogic.com>
-Signed-off-by: Luan Yuan <luan.yuan@amlogic.com>
----
- prebuilts/api/28.0/public/app.te            | 2 +-
- prebuilts/api/28.0/public/dnsmasq.te        | 7 +++++++
- prebuilts/api/28.0/public/domain.te         | 1 +
- prebuilts/api/28.0/public/servicemanager.te | 3 +++
- prebuilts/api/28.0/public/shell.te          | 2 ++
- prebuilts/api/28.0/public/system_server.te  | 2 ++
- public/app.te                               | 2 +-
- public/dnsmasq.te                           | 7 +++++++
- public/domain.te                            | 1 +
- public/servicemanager.te                    | 3 +++
- public/shell.te                             | 2 ++
- public/system_server.te                     | 2 ++
- 12 files changed, 32 insertions(+), 2 deletions(-)
 
 diff --git a/prebuilts/api/28.0/public/app.te b/prebuilts/api/28.0/public/app.te
 index 439c1f8..13ba8f0 100644
@@ -74,13 +59,13 @@ index e9337b6..806ef60 100644
  neverallow { domain -traced_probes } self:capability dac_read_search;
  
 diff --git a/prebuilts/api/28.0/public/servicemanager.te b/prebuilts/api/28.0/public/servicemanager.te
-index 87e3a22..b04b1fe 100644
+index 4c1b4e5..480f20e 100644
 --- a/prebuilts/api/28.0/public/servicemanager.te
 +++ b/prebuilts/api/28.0/public/servicemanager.te
-@@ -18,6 +18,9 @@ allow servicemanager {
- }:binder transfer;
- 
- allow servicemanager service_contexts_file:file r_file_perms;
+@@ -21,6 +21,9 @@ allow servicemanager service_contexts_file:file r_file_perms;
+ allow servicemanager screen_control:dir { search };
+ allow servicemanager screen_control:file { read open };
+ allow servicemanager screen_control:process { getattr };
 +allow servicemanager dnsmasq:dir { search };
 +allow servicemanager dnsmasq:file { read open };
 +allow servicemanager dnsmasq:process { getattr };
@@ -101,15 +86,16 @@ index 307e103..2788cbf 100644
  ### Neverallow rules
  ###
 diff --git a/prebuilts/api/28.0/public/system_server.te b/prebuilts/api/28.0/public/system_server.te
-index 805d617..e412599 100644
+index b7035c3..dc87a47 100644
 --- a/prebuilts/api/28.0/public/system_server.te
 +++ b/prebuilts/api/28.0/public/system_server.te
-@@ -3,3 +3,5 @@
- # Most of the framework services run in this process.
- #
+@@ -5,3 +5,5 @@
  type system_server, domain;
+ allow system_server screen_control:dir { search };
+ allow system_server screen_control:file { read getattr open };
 +allow system_server netd:fifo_file { read getattr open };
 +allow system_server dnsmasq:binder { call };
+\ No newline at end of file
 diff --git a/public/app.te b/public/app.te
 index 439c1f8..13ba8f0 100644
 --- a/public/app.te
@@ -152,13 +138,13 @@ index e9337b6..806ef60 100644
  neverallow { domain -traced_probes } self:capability dac_read_search;
  
 diff --git a/public/servicemanager.te b/public/servicemanager.te
-index 87e3a22..b04b1fe 100644
+index 4c1b4e5..480f20e 100644
 --- a/public/servicemanager.te
 +++ b/public/servicemanager.te
-@@ -18,6 +18,9 @@ allow servicemanager {
- }:binder transfer;
- 
- allow servicemanager service_contexts_file:file r_file_perms;
+@@ -21,6 +21,9 @@ allow servicemanager service_contexts_file:file r_file_perms;
+ allow servicemanager screen_control:dir { search };
+ allow servicemanager screen_control:file { read open };
+ allow servicemanager screen_control:process { getattr };
 +allow servicemanager dnsmasq:dir { search };
 +allow servicemanager dnsmasq:file { read open };
 +allow servicemanager dnsmasq:process { getattr };
@@ -179,15 +165,16 @@ index 307e103..2788cbf 100644
  ### Neverallow rules
  ###
 diff --git a/public/system_server.te b/public/system_server.te
-index 805d617..e412599 100644
+index b7035c3..dc87a47 100644
 --- a/public/system_server.te
 +++ b/public/system_server.te
-@@ -3,3 +3,5 @@
- # Most of the framework services run in this process.
- #
+@@ -5,3 +5,5 @@
  type system_server, domain;
+ allow system_server screen_control:dir { search };
+ allow system_server screen_control:file { read getattr open };
 +allow system_server netd:fifo_file { read getattr open };
 +allow system_server dnsmasq:binder { call };
+\ No newline at end of file
 -- 
 1.9.1
 
