@@ -1,0 +1,70 @@
+From 6060998b112f80ca6dfdf77a9bd130072ec92e32 Mon Sep 17 00:00:00 2001
+From: Jinping Wang <jinping.wang@amlogic.com>
+Date: Fri, 24 May 2019 19:52:28 +0800
+Subject: [PATCH] cec: mActiveRoutingPath is invalid [1/1]
+
+PD# SWPL-8469
+
+Problem:
+mActiveRoutingPath is invalid when change into
+
+Solution:
+re set mActiveRoutingPath when port select
+
+Verify:
+test ok using p321
+
+Change-Id: Ia0a3bf2eac000c814a6ffb472aec00702f65335e
+Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
+---
+ .../server/hdmi/HdmiCecLocalDeviceAudioSystem.java | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceAudioSystem.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceAudioSystem.java
+index d595c79f..566d0ba 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceAudioSystem.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceAudioSystem.java
+@@ -403,9 +403,32 @@ public class HdmiCecLocalDeviceAudioSystem extends HdmiCecLocalDevice {
+         if (getActiveSource().isValid()) {
+             return getActiveSource().logicalAddress;
+         }
++        HdmiDeviceInfo info = getDeviceInfoByPath(getActivePath());
++        if (info != null) {
++            return info.getLogicalAddress();
++        }
+         return Constants.ADDR_INVALID;
+     }
+ 
++    /**
++     * Returns the {@link HdmiDeviceInfo} instance whose physical address matches
++     * the given routing path. CEC devices use routing path for its physical address to
++     * describe the hierarchy of the devices in the network.
++     *
++     * @param path routing path or physical address
++     * @return {@link HdmiDeviceInfo} if the matched info is found; otherwise null
++     */
++    @ServiceThreadOnly
++    final HdmiDeviceInfo getDeviceInfoByPath(int path) {
++        assertRunOnServiceThread();
++        for (HdmiDeviceInfo info : getSafeCecDevicesLocked()) {
++            if (info.getPhysicalAddress() == path) {
++                return info;
++            }
++        }
++        return null;
++    }
++
+     @VisibleForTesting
+     protected void systemAudioControlOnPowerOn(
+         int systemAudioOnPowerOnProp, boolean lastSystemAudioControlStatus) {
+@@ -1030,6 +1053,7 @@ public class HdmiCecLocalDeviceAudioSystem extends HdmiCecLocalDevice {
+         }
+         setRoutingPort(portId);
+         setLocalActivePort(portId);
++        setActivePath(newPath);
+         HdmiCecMessage routingChange =
+                 HdmiCecMessageBuilder.buildRoutingChange(mAddress, oldPath, newPath);
+         mService.sendCecCommand(routingChange);
+-- 
+2.10.2
+

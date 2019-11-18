@@ -25,7 +25,6 @@ function auto_patch()
                     then
                         git am --abort
                         echo "    ### patch_dir ${patch_dir##*/} $file failed,maybe already patched    "
-                        return 1
                     fi
                 else
                     echo "    ###${file##*/} has patched###      "

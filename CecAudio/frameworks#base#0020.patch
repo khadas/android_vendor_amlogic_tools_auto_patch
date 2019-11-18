@@ -1,0 +1,87 @@
+From b89363e50315c4a858415c60d12ec5276f80d8c5 Mon Sep 17 00:00:00 2001
+From: Chaomin Zheng <chaomin.zheng@amlogic.com>
+Date: Tue, 16 Jul 2019 10:50:09 +0800
+Subject: [PATCH] Arc: change system audio mode request cmd parameter [1/1]
+
+PD# SWPL-7878
+
+Problem:
+DVD-AMP=TV,ARC switch set off, unplug HDMI ARC cable or power off AMP, Speaker has no sound
+
+Solution:
+change system audio mode request cmd parameter
+
+Verify:
+verify by x301
+
+Change-Id: Ia7beea4484ec999094b4557e945c7ed01a840924
+Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
+---
+ .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 22 +++-------------------
+ 1 file changed, 3 insertions(+), 19 deletions(-)
+
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
+index 5f8ce1c..74329d8 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
+@@ -87,8 +87,6 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+ 
+     private boolean mSkipSendRequestSystemAudioMode = false;
+ 
+-    private boolean mSkipHandleSetSystemAudioMode = false;
+-
+     private Runnable mUnMuteSpeakerRunnable = new Runnable() {
+ 
+         @Override
+@@ -958,27 +956,15 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+     }
+ 
+     private void sendSystemAudioModeRequest(boolean enableSystemAudio) {
+-        if (!isSystemAudioControlFeatureEnabled()) {
+-            HdmiLogger.debug("Ignoring <System Audio Mode Request> message "
+-                    + "because the System Audio Control feature is disabled.");
+-            return;
+-        }
+-
+         HdmiDeviceInfo avr = getAvrDeviceInfo();
+         if (avr == null || mSkipSendRequestSystemAudioMode) {
+             enableSystemAudio = false;
+             return;
+         }
+ 
+-        if (enableSystemAudio) {
+-            mSkipHandleSetSystemAudioMode = false;
+-        } else {
+-            mSkipHandleSetSystemAudioMode = true;
+-        }
+-
+         HdmiCecMessage command = HdmiCecMessageBuilder.buildSystemAudioModeRequest(
+                 mAddress, Constants.ADDR_AUDIO_SYSTEM,
+-                enableSystemAudio ? avr.getPhysicalAddress() : mAddress, true);
++                enableSystemAudio ? avr.getPhysicalAddress() : mAddress, enableSystemAudio);
+         mService.sendCecCommand(command, new HdmiControlService.SendMessageCallback() {
+             @Override
+             public void onSendCompleted(int error) {
+@@ -1343,6 +1329,8 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+             HdmiLogger.debug("Ignoring <Set System Audio Mode> message "
+                     + "because the System Audio Control feature is disabled: %s", message);
+             mService.maySendFeatureAbortCommand(message, Constants.ABORT_REFUSED);
++            mSkipSendRequestSystemAudioMode = false;
++            sendSystemAudioModeRequest(!systemAudioStatus);
+             return true;
+         }
+         if (systemAudioStatus) {
+@@ -1350,10 +1338,6 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+         } else {
+             mSkipSendRequestSystemAudioMode = true;
+         }
+-        if (systemAudioStatus && mSkipHandleSetSystemAudioMode) {
+-            mSkipHandleSetSystemAudioMode = false;
+-            return true;
+-        }
+         removeAction(SystemAudioAutoInitiationAction.class);
+         SystemAudioActionFromAvr action = new SystemAudioActionFromAvr(this,
+                 message.getSource(), systemAudioStatus, null);
+-- 
+2.7.4
+

@@ -1,0 +1,48 @@
+From 3cc9f3f429c4bf4de16470dd6c45ed68b81f6083 Mon Sep 17 00:00:00 2001
+From: Wencai You <wencai.you@amlogic.com>
+Date: Wed, 21 Aug 2019 16:14:25 +0800
+Subject: [PATCH] security: Security patch fixed for bulletin-2019-08-preview
+ [1/1]
+
+PD# SWPL-13008
+
+Problem:
+after apply security patch
+-audiopolicy: Remove raw pointer references to AudioMix
+have complie fail after autopatch
+-frameworks#av#0009.patch  apply
+
+Solution:
+add fixed from p-tv-dev
+
+Verify:
+u212
+
+Change-Id: I0f021b72dd360473bbde08172af5e0a78e555899
+Signed-off-by: Wencai You <wencai.you@amlogic.com>
+---
+ services/audiopolicy/managerdefault/AudioPolicyManager.cpp | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
+index 3e2365a..36f7bb9 100644
+--- a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
++++ b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
+@@ -229,10 +229,11 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
+                 && strncmp(device_address, "0", AUDIO_DEVICE_MAX_ADDRESS_LEN) != 0) {
+             for (audio_io_handle_t output : outputs) {
+                 sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
+-                if (desc->mPolicyMix != nullptr
+-                        && desc->mPolicyMix->mMixType == MIX_TYPE_RECORDERS
++				sp<AudioPolicyMix> policyMix = desc->mPolicyMix.promote();
++                if (policyMix != nullptr
++                        && policyMix->mMixType == MIX_TYPE_RECORDERS
+                         && strncmp(device_address,
+-                                   desc->mPolicyMix->mDeviceAddress.string(),
++                                   policyMix->mDeviceAddress.string(),
+                                    AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0) {
+                     doCheckForDeviceAndOutputChanges = false;
+                     break;
+-- 
+1.9.1
+

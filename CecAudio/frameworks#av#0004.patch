@@ -1,4 +1,4 @@
-From 9693e4ae83c16ee2bb3f85ae516515f961af630a Mon Sep 17 00:00:00 2001
+From 7d05238ff6a451e2bf2a23ee88acc1bfef6644b3 Mon Sep 17 00:00:00 2001
 From: Chaomin Zheng <chaomin.zheng@amlogic.com>
 Date: Fri, 25 Jan 2019 15:15:05 +0800
 Subject: [PATCH] audio policy: fix speaker gain calculation [2/4]
@@ -17,16 +17,16 @@ verify by p321
 Change-Id: Ided188523c578c8fa78ca4c832afdd7d96c126a6
 Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
 ---
- .../include/AudioOutputDescriptor.h                |  6 ++-
+ .../include/AudioOutputDescriptor.h                |  6 ++--
  .../src/AudioOutputDescriptor.cpp                  | 25 +++++++------
- .../managerdefault/AudioPolicyManager.cpp          | 43 ++++++++++++----------
- 3 files changed, 42 insertions(+), 32 deletions(-)
+ .../managerdefault/AudioPolicyManager.cpp          | 42 ++++++++++++----------
+ 3 files changed, 41 insertions(+), 32 deletions(-)
 
 diff --git a/services/audiopolicy/common/managerdefinitions/include/AudioOutputDescriptor.h b/services/audiopolicy/common/managerdefinitions/include/AudioOutputDescriptor.h
-index 7288551..d4b8c3d 100644
+index 4d14fbf..18b55c0 100644
 --- a/services/audiopolicy/common/managerdefinitions/include/AudioOutputDescriptor.h
 +++ b/services/audiopolicy/common/managerdefinitions/include/AudioOutputDescriptor.h
-@@ -86,7 +86,8 @@ public:
+@@ -89,7 +89,8 @@ public:
                                          // device selection. See checkDeviceMuteStrategies()
      AudioPolicyClientInterface *mClientInterface;
  
@@ -36,7 +36,7 @@ index 7288551..d4b8c3d 100644
  
  protected:
      audio_patch_handle_t mPatchHandle;
-@@ -139,7 +140,8 @@ public:
+@@ -142,7 +143,8 @@ public:
                                       const sp<SwAudioOutputDescriptor>& output2,
                                       audio_io_handle_t *ioHandle);
  
@@ -47,10 +47,10 @@ index 7288551..d4b8c3d 100644
      const sp<IOProfile> mProfile;          // I/O profile this output derives from
      audio_io_handle_t mIoHandle;           // output handle
 diff --git a/services/audiopolicy/common/managerdefinitions/src/AudioOutputDescriptor.cpp b/services/audiopolicy/common/managerdefinitions/src/AudioOutputDescriptor.cpp
-index 74c085f..e8e780f 100644
+index e323247..14b21e5 100644
 --- a/services/audiopolicy/common/managerdefinitions/src/AudioOutputDescriptor.cpp
 +++ b/services/audiopolicy/common/managerdefinitions/src/AudioOutputDescriptor.cpp
-@@ -218,14 +218,18 @@ void AudioOutputDescriptor::log(const char* indent)
+@@ -235,14 +235,18 @@ void AudioOutputDescriptor::log(const char* indent)
            indent, mId, mId, mSamplingRate, mFormat, mChannelMask);
  }
  
@@ -73,7 +73,7 @@ index 74c085f..e8e780f 100644
  {
      if (mProfile == 0) {
          ALOGE("Error: this SwAudioOutputDescriptor doesn't have valid mProfile!");
-@@ -258,13 +262,12 @@ bool SwAudioOutputDescriptor::updateGain(audio_stream_type_t stream __unused,
+@@ -275,13 +279,12 @@ bool SwAudioOutputDescriptor::updateGain(audio_stream_type_t stream __unused,
      int gainMinValueInMb = gainCol[0]->getMinValueInMb();
      int gainMaxValueInMb = gainCol[0]->getMaxValueInMb();
      int gainStepValueInMb = gainCol[0]->getStepValueInMb();
@@ -94,12 +94,12 @@ index 74c085f..e8e780f 100644
      struct audio_port_config newConfig;
      struct audio_port_config backupConfig;
 diff --git a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
-index a71312a..2ff94e8 100644
+index d6716be..930de8a 100644
 --- a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
 +++ b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
-@@ -5660,29 +5660,34 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
+@@ -5753,29 +5753,33 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
  
-     if (mIsPlatformTelevision) {
+     if (property_get_int32("ro.vendor.platform.is.tv", 0) != 0) {
          audio_devices_t curDevice = Volume::getDeviceForVolume(getDevicesForStream(AUDIO_STREAM_MUSIC));
 -        if (curDevice == AUDIO_DEVICE_OUT_HDMI_ARC ||
 -            curDevice == AUDIO_DEVICE_OUT_WIRED_HEADPHONE ||
@@ -128,7 +128,6 @@ index a71312a..2ff94e8 100644
 -                }
 -            }
 -            outputDesc->updateGain(stream, curDevice, mediaVolume);
-+
 +            float musicVolumeDb = mVolumeCurves->volIndexToDb(AUDIO_STREAM_MUSIC,
 +                                        Volume::getDeviceCategory(curDevice), volumeIndex);
 +            float maxMusicVolumeDb = mVolumeCurves->volIndexToDb(AUDIO_STREAM_MUSIC,
@@ -152,5 +151,5 @@ index a71312a..2ff94e8 100644
      }
  
 -- 
-1.9.1
+2.7.4
 

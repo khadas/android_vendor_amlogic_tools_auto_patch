@@ -38,7 +38,6 @@ function auto_patch()
                         git am --abort
                         echo "!!! Patch Warnning !!! "
                         echo "### patch_dir ${patch_dir##*/} $file failed,maybe already patched    "
-                        return 1
                     fi
                 fi
             fi

@@ -1,0 +1,63 @@
+From e8860b013508b70bb73c4b41ce15122a8a175e83 Mon Sep 17 00:00:00 2001
+From: Jinping Wang <jinping.wang@amlogic.com>
+Date: Mon, 8 Jul 2019 16:50:54 +0800
+Subject: [PATCH] cec: HdmiSwitchClient block cts [2/2]
+
+PD# TV-7238
+
+Problem:
+HdmiSwitchClient not support in P and Q,
+it is available in R
+
+Solution:
+HdmiSwitchClient is replaced by HdmiTvClient
+
+Verify:
+test ok using x301
+
+Change-Id: I088a0fc936f0c5eb0da9ebcd0742fc5f3a0c025d
+Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
+---
+ .../android/hardware/hdmi/HdmiControlManager.java     | 19 -------------------
+ 1 file changed, 19 deletions(-)
+
+diff --git a/core/java/android/hardware/hdmi/HdmiControlManager.java b/core/java/android/hardware/hdmi/HdmiControlManager.java
+index 99bb65c..bc2d5c7 100644
+--- a/core/java/android/hardware/hdmi/HdmiControlManager.java
++++ b/core/java/android/hardware/hdmi/HdmiControlManager.java
+@@ -321,8 +321,6 @@ public final class HdmiControlManager {
+                 return mHasPlaybackDevice ? new HdmiPlaybackClient(mService) : null;
+             case HdmiDeviceInfo.DEVICE_AUDIO_SYSTEM:
+                 return mHasAudioSystemDevice ? new HdmiAudioSystemClient(mService) : null;
+-            case HdmiDeviceInfo.DEVICE_PURE_CEC_SWITCH:
+-                return mHasSwitchDevice ? new HdmiSwitchClient(mService) : null;
+             default:
+                 return null;
+         }
+@@ -377,23 +375,6 @@ public final class HdmiControlManager {
+     }
+ 
+     /**
+-     * Gets an object that represents an HDMI-CEC logical device of type switch on the system.
+-     *
+-     * <p>Used to send HDMI control messages to other devices like TV through HDMI bus. It is also
+-     * possible to communicate with other logical devices hosted in the same system if the system is
+-     * configured to host more than one type of HDMI-CEC logical devices.
+-     *
+-     * @return {@link HdmiSwitchClient} instance. {@code null} on failure.
+-     *
+-     * TODO(b/110094868): unhide for Q
+-     */
+-    @Nullable
+-    @SuppressLint("Doclava125")
+-    public HdmiSwitchClient getSwitchClient() {
+-        return (HdmiSwitchClient) getClient(HdmiDeviceInfo.DEVICE_PURE_CEC_SWITCH);
+-    }
+-
+-    /**
+      * Controls standby mode of the system. It will also try to turn on/off the connected devices if
+      * necessary.
+      *
+-- 
+2.10.2
+

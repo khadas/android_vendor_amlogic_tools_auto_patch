@@ -1,0 +1,38 @@
+From 9332118619bd6b64949d22ea7390cf890110fad9 Mon Sep 17 00:00:00 2001
+From: xian <an.xi@amlogic.com>
+Date: Thu, 29 Aug 2019 04:48:01 -0400
+Subject: [PATCH] SystemServer: fix set stream path issue for OTT branch [1/1]
+
+PD#OTT-5407
+
+Problem:
+ott branch playback devices can't be waked up by TV.
+
+Solution:
+set the active source when the playback portId is -1.
+
+Verify:
+verify it on Franklin OTT branch
+
+Change-Id: Ib28369226122d337be3680426cb1927d9b273435
+Signed-off-by: an.xi <an.xi@amlogic.com>
+---
+ .../core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java   | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
+index b3aef04..4fda94a 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
+@@ -263,7 +263,7 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+         // If current device is the target path, set to Active Source. 
+         // If the path is under the current device, should switch
+         int port = getLocalPortFromPhysicalAddress(physicalAddress);
+-        if (port == 0) {
++        if (port <= 0) {
+             setActiveSource(true);
+             maySendActiveSource(message.getSource());
+             wakeUpIfActiveSource();
+-- 
+2.7.4
+

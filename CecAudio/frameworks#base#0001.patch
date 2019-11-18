@@ -1,13 +1,13 @@
-From 6fb8046172e29a105e596bf2dd1e028c1df801d8 Mon Sep 17 00:00:00 2001
+From b32eff503c1003bf9800abb25908dd21889cd8c9 Mon Sep 17 00:00:00 2001
 From: Chaomin Zheng <chaomin.zheng@amlogic.com>
-Date: Tue, 9 Oct 2018 14:45:53 +0800
+Date: Sat, 29 Sep 2018 16:02:48 +0800
 Subject: [PATCH] Audio:add arc request short audio descriptor action[4/4]
 
 PD# 315
 
 add arc request short audio descriptor action
 
-Change-Id: I3f724c94ca538bbc93b7ffff540bf31d9251260f
+Change-Id: I4f8e2594a1391b36a4eaff0d86b19b5502338165
 ---
  core/java/android/provider/Settings.java           |   9 +
  .../com/android/server/audio/AudioService.java     |  46 +++-
@@ -21,10 +21,10 @@ Change-Id: I3f724c94ca538bbc93b7ffff540bf31d9251260f
  create mode 100644 services/core/java/com/android/server/hdmi/RequestShortAudioDescriptorAction.java
 
 diff --git a/core/java/android/provider/Settings.java b/core/java/android/provider/Settings.java
-index 0510418..f68cf83 100644
+index 601e31a..35309fc 100644
 --- a/core/java/android/provider/Settings.java
 +++ b/core/java/android/provider/Settings.java
-@@ -8949,6 +8949,15 @@ public final class Settings {
+@@ -8940,6 +8940,15 @@ public final class Settings {
                  "hdmi_system_audio_control_enabled";
  
          /**
@@ -41,10 +41,10 @@ index 0510418..f68cf83 100644
           * &lt;Text View On&gt; or &lt;Image View On&gt;. (0 = false, 1 = true)
           *
 diff --git a/services/core/java/com/android/server/audio/AudioService.java b/services/core/java/com/android/server/audio/AudioService.java
-index 13de652..989b989 100644
+index d1de55d..ff11c39 100644
 --- a/services/core/java/com/android/server/audio/AudioService.java
 +++ b/services/core/java/com/android/server/audio/AudioService.java
-@@ -358,10 +358,10 @@ public class AudioService extends IAudioService.Stub
+@@ -357,10 +357,10 @@ public class AudioService extends IAudioService.Stub
      };
      private final int[] STREAM_VOLUME_ALIAS_TELEVISION = new int[] {
          AudioSystem.STREAM_MUSIC,       // STREAM_VOICE_CALL
@@ -58,7 +58,7 @@ index 13de652..989b989 100644
          AudioSystem.STREAM_MUSIC,       // STREAM_NOTIFICATION
          AudioSystem.STREAM_MUSIC,       // STREAM_BLUETOOTH_SCO
          AudioSystem.STREAM_MUSIC,       // STREAM_SYSTEM_ENFORCED
-@@ -593,7 +593,7 @@ public class AudioService extends IAudioService.Stub
+@@ -592,7 +592,7 @@ public class AudioService extends IAudioService.Stub
              = new RemoteCallbackList<IAudioRoutesObserver>();
  
      // Devices for which the volume is fixed and VolumePanel slider should be disabled
@@ -67,7 +67,7 @@ index 13de652..989b989 100644
              AudioSystem.DEVICE_OUT_DGTL_DOCK_HEADSET |
              AudioSystem.DEVICE_OUT_ANLG_DOCK_HEADSET |
              AudioSystem.DEVICE_OUT_HDMI_ARC |
-@@ -4551,10 +4551,16 @@ public class AudioService extends IAudioService.Stub
+@@ -4571,10 +4571,16 @@ public class AudioService extends IAudioService.Stub
              // retain the device on the A2DP output as the other must not correspond to an active
              // selection if not the speaker.
              //  - HDMI-CEC system audio mode only output: give priority to available item in order.
@@ -87,7 +87,7 @@ index 13de652..989b989 100644
              } else if ((device & AudioSystem.DEVICE_OUT_SPDIF) != 0) {
                  device = AudioSystem.DEVICE_OUT_SPDIF;
              } else if ((device & AudioSystem.DEVICE_OUT_AUX_LINE) != 0) {
-@@ -5992,6 +5998,11 @@ public class AudioService extends IAudioService.Stub
+@@ -6019,6 +6025,11 @@ public class AudioService extends IAudioService.Stub
                          "onSetA2dpSinkConnectionState");
                  setCurrentAudioRouteName(btDevice.getAliasName());
              }
@@ -99,7 +99,7 @@ index 13de652..989b989 100644
          }
      }
  
-@@ -6326,6 +6337,10 @@ public class AudioService extends IAudioService.Stub
+@@ -6357,6 +6368,10 @@ public class AudioService extends IAudioService.Stub
                  // change of connection state failed, bailout
                  return;
              }
@@ -110,16 +110,16 @@ index 13de652..989b989 100644
              if (state != 0) {
                  if ((device & DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG) != 0) {
                      setBluetoothA2dpOnInt(false, "onSetWiredDeviceConnectionState state not 0");
-@@ -6341,7 +6356,7 @@ public class AudioService extends IAudioService.Stub
+@@ -6372,7 +6387,7 @@ public class AudioService extends IAudioService.Stub
                  }
                  // Television devices without CEC service apply software volume on HDMI output
                  if (isPlatformTelevision() && ((device & AudioSystem.DEVICE_OUT_HDMI) != 0)) {
 -                    mFixedVolumeDevices |= AudioSystem.DEVICE_OUT_HDMI;
 +                    //mFixedVolumeDevices |= AudioSystem.DEVICE_OUT_HDMI;
                      checkAllFixedVolumeDevices();
-                     if (mHdmiManager != null) {
-                         synchronized (mHdmiManager) {
-@@ -6369,6 +6384,21 @@ public class AudioService extends IAudioService.Stub
+                     synchronized (mHdmiClientLock) {
+                         if (mHdmiManager != null && mHdmiPlaybackClient != null) {
+@@ -6398,6 +6413,21 @@ public class AudioService extends IAudioService.Stub
          }
      }
  
@@ -272,10 +272,10 @@ index de0f298..4031d19 100644
          removeAction(RequestArcInitiationAction.class);
          if (!hasAction(RequestArcTerminationAction.class) && isArcEstablished()) {
 diff --git a/services/core/java/com/android/server/hdmi/HdmiControlService.java b/services/core/java/com/android/server/hdmi/HdmiControlService.java
-index b06dba9..dd8b7eb 100644
+index a20b427..6018383 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiControlService.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiControlService.java
-@@ -488,6 +488,7 @@ public final class HdmiControlService extends SystemService {
+@@ -512,6 +512,7 @@ public class HdmiControlService extends SystemService {
                  Global.HDMI_CONTROL_AUTO_WAKEUP_ENABLED,
                  Global.HDMI_CONTROL_AUTO_DEVICE_OFF_ENABLED,
                  Global.HDMI_SYSTEM_AUDIO_CONTROL_ENABLED,
@@ -283,7 +283,7 @@ index b06dba9..dd8b7eb 100644
                  Global.MHL_INPUT_SWITCHING_ENABLED,
                  Global.MHL_POWER_CHARGE_ENABLED
          };
-@@ -531,6 +532,11 @@ public final class HdmiControlService extends SystemService {
+@@ -560,6 +561,11 @@ public class HdmiControlService extends SystemService {
                          tv().setSystemAudioControlFeatureEnabled(enabled);
                      }
                      break;
@@ -599,7 +599,7 @@ index d347a91..4ec01fc 100644
              addAndStartAction(
                      new SystemAudioActionFromTv(tv(), mAvrAddress, targetSystemAudioMode, null));
 diff --git a/services/core/java/com/android/server/hdmi/SystemAudioStatusAction.java b/services/core/java/com/android/server/hdmi/SystemAudioStatusAction.java
-index d41a36c..742c024 100644
+index 13f0f4ae..df94d67 100644
 --- a/services/core/java/com/android/server/hdmi/SystemAudioStatusAction.java
 +++ b/services/core/java/com/android/server/hdmi/SystemAudioStatusAction.java
 @@ -47,7 +47,9 @@ final class SystemAudioStatusAction extends HdmiCecFeatureAction {
@@ -639,5 +639,5 @@ index 0011387..dc47fcb 100644
      }
  
 -- 
-2.7.4
+1.9.1
 

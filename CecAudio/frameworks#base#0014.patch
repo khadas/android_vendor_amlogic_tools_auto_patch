@@ -1,0 +1,87 @@
+From 305821b29ceb5b5eabc10a93277018f4d5d18876 Mon Sep 17 00:00:00 2001
+From: Chaomin Zheng <chaomin.zheng@amlogic.com>
+Date: Wed, 22 May 2019 14:43:30 +0800
+Subject: [PATCH] Arc: when arc switch off, change hdmi port arc feature [1/1]
+
+PD# SWPL-8636
+
+Problem:
+ARC switch set off, the AMP has sound output after CEC switch set off/on
+
+Solution:
+when arc switch off, change hdmi port arc feature
+
+Verify:
+verify by x301
+
+Change-Id: I9c9981e33981e685f43ad141857f214c8b868011
+Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
+---
+ .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 29 ++++++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)
+
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
+index 9a7d842..a3c334f 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
+@@ -204,7 +204,8 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+         assertRunOnServiceThread();
+         List<HdmiPortInfo> ports = mService.getPortInfo();
+         for (HdmiPortInfo port : ports) {
+-            mArcFeatureEnabled.put(port.getId(), port.isArcSupported());
++            mArcFeatureEnabled.put(port.getId(), isSystemAudioControlFeatureEnabled() ?
++                    port.isArcSupported() : false);
+         }
+         mService.registerTvInputCallback(mTvInputCallback);
+         mService.sendCecCommand(HdmiCecMessageBuilder.buildReportPhysicalAddressCommand(
+@@ -803,6 +804,19 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+         addAndStartAction(action);
+     }
+ 
++    void turnOnAvrDevice(HdmiDeviceInfo avr) {
++        HdmiCecMessage msg = HdmiCecMessageBuilder.buildSystemAudioModeRequest(
++                mAddress, avr.getLogicalAddress(), avr.getPhysicalAddress(), true);
++        mService.sendCecCommand(msg, new SendMessageCallback() {
++            @Override
++            public void onSendCompleted(int error) {
++                if (error != SendMessageResult.SUCCESS) {
++                    Slog.d(TAG, "send buildSystemAudioModeRequest failed:\n" + error);
++                }
++            }
++        });
++    }
++
+     @ServiceThreadOnly
+     void onNewAvrAdded(HdmiDeviceInfo avr) {
+         assertRunOnServiceThread();
+@@ -811,6 +825,11 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+                 && !hasAction(SetArcTransmissionStateAction.class)) {
+             startArcAction(true);
+         }
++        if ((!isSystemAudioControlFeatureEnabled())
++                && isConnectedToArcPort(avr.getPhysicalAddress())
++                && HdmiControlManager.POWER_STATUS_ON != avr.getDevicePowerStatus()) {
++            turnOnAvrDevice(avr);
++        }
+     }
+ 
+     // Clear all device info.
+@@ -955,8 +974,14 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+         synchronized (mLock) {
+             mSystemAudioControlFeatureEnabled = enabled;
+         }
+-        if (hasSystemAudioDevice()) {
++        /* if (hasSystemAudioDevice()) {
+             changeSystemAudioMode(enabled, null);
++        } */
++        List<HdmiPortInfo> ports = mService.getPortInfo();
++        for (HdmiPortInfo port : ports) {
++            if (port.isArcSupported()) {
++                changeArcFeatureEnabled(port.getId(), enabled);
++            }
+         }
+     }
+ 
+-- 
+2.7.4
+

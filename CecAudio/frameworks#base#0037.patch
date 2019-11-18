@@ -1,0 +1,127 @@
+From 2e27463f0db62e076e5ef07df70b6ee626bbf516 Mon Sep 17 00:00:00 2001
+From: xian <an.xi@amlogic.com>
+Date: Wed, 23 Oct 2019 15:05:05 +0800
+Subject: [PATCH] SystemServer: fix audio system platform can't send keyevent
+ issue [1/2]
+
+PD#SWPL-11832
+
+Problem:
+audio system platform can't send keyevent to playback
+
+Solution:
+add framework support
+
+Verify:
+verify it on T962E2 and Ampere
+
+Change-Id: Ib4066dc5b9fdca0c41d60b61e9b1df06d7b31cd2
+Signed-off-by: xian <an.xi@amlogic.com>
+---
+ api/system-current.txt                                     | 8 +++++++-
+ core/java/android/hardware/hdmi/HdmiAudioSystemClient.java | 8 +++-----
+ core/java/android/hardware/hdmi/HdmiControlManager.java    | 1 -
+ core/java/android/hardware/hdmi/HdmiTvClient.java          | 2 +-
+ 4 files changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/api/system-current.txt b/api/system-current.txt
+index 793e75d..78b7fb1 100644
+--- a/api/system-current.txt
++++ b/api/system-current.txt
+@@ -1274,6 +1274,11 @@ package android.hardware.display {
+ 
+ package android.hardware.hdmi {
+ 
++  public final class HdmiAudioSystemClient extends android.hardware.hdmi.HdmiTvClient {
++    ctor public HdmiAudioSystemClient(android.hardware.hdmi.IHdmiControlService);
++    ctor public HdmiAudioSystemClient(android.hardware.hdmi.IHdmiControlService, android.os.Handler);
++  }
++
+   public abstract class HdmiClient {
+     method public android.hardware.hdmi.HdmiDeviceInfo getActiveSource();
+     method public void sendKeyEvent(int, boolean);
+@@ -1284,6 +1289,7 @@ package android.hardware.hdmi {
+   public final class HdmiControlManager {
+     ctor public HdmiControlManager(android.hardware.hdmi.IHdmiControlService);
+     method public void addHotplugEventListener(android.hardware.hdmi.HdmiControlManager.HotplugEventListener);
++    method public android.hardware.hdmi.HdmiAudioSystemClient getAudioSystemClient();
+     method public android.hardware.hdmi.HdmiClient getClient(int);
+     method public android.hardware.hdmi.HdmiPlaybackClient getPlaybackClient();
+     method public android.hardware.hdmi.HdmiTvClient getTvClient();
+@@ -1534,7 +1540,7 @@ package android.hardware.hdmi {
+   public static final class HdmiTimerRecordSources.TimerRecordSource {
+   }
+ 
+-  public final class HdmiTvClient extends android.hardware.hdmi.HdmiClient {
++  public class HdmiTvClient extends android.hardware.hdmi.HdmiClient {
+     method public void clearTimerRecording(int, int, android.hardware.hdmi.HdmiTimerRecordSources.TimerRecordSource);
+     method public void deviceSelect(int, android.hardware.hdmi.HdmiTvClient.SelectCallback);
+     method public java.util.List<android.hardware.hdmi.HdmiDeviceInfo> getDeviceList();
+diff --git a/core/java/android/hardware/hdmi/HdmiAudioSystemClient.java b/core/java/android/hardware/hdmi/HdmiAudioSystemClient.java
+index 9bebbd2..65cd340 100644
+--- a/core/java/android/hardware/hdmi/HdmiAudioSystemClient.java
++++ b/core/java/android/hardware/hdmi/HdmiAudioSystemClient.java
+@@ -16,11 +16,10 @@
+ package android.hardware.hdmi;
+ 
+ import android.annotation.Nullable;
++import android.annotation.SystemApi;
+ import android.os.Handler;
+ import android.os.RemoteException;
+ 
+-import com.android.internal.annotations.VisibleForTesting;
+-import com.android.internal.annotations.VisibleForTesting.Visibility;
+ 
+ /**
+  * HdmiAudioSystemClient represents HDMI-CEC logical device of type Audio System in the Android
+@@ -31,7 +30,8 @@ import com.android.internal.annotations.VisibleForTesting.Visibility;
+  *
+  * @hide
+  */
+-public final class HdmiAudioSystemClient extends HdmiClient {
++@SystemApi
++public final class HdmiAudioSystemClient extends HdmiTvClient {
+     private static final String TAG = "HdmiAudioSystemClient";
+ 
+     private static final int REPORT_AUDIO_STATUS_INTERVAL_MS = 500;
+@@ -44,12 +44,10 @@ public final class HdmiAudioSystemClient extends HdmiClient {
+     private int mLastMaxVolume;
+     private boolean mLastIsMute;
+ 
+-    @VisibleForTesting(visibility = Visibility.PACKAGE)
+     public HdmiAudioSystemClient(IHdmiControlService service) {
+         this(service, null);
+     }
+ 
+-    @VisibleForTesting(visibility = Visibility.PACKAGE)
+     public HdmiAudioSystemClient(IHdmiControlService service, @Nullable Handler handler) {
+         super(service);
+         mHandler = handler == null ? new Handler() : handler;
+diff --git a/core/java/android/hardware/hdmi/HdmiControlManager.java b/core/java/android/hardware/hdmi/HdmiControlManager.java
+index bc2d5c7..4157b27 100644
+--- a/core/java/android/hardware/hdmi/HdmiControlManager.java
++++ b/core/java/android/hardware/hdmi/HdmiControlManager.java
+@@ -366,7 +366,6 @@ public final class HdmiControlManager {
+      * @return {@link HdmiAudioSystemClient} instance. {@code null} on failure.
+      *
+      * TODO(b/110094868): unhide for Q
+-     * @hide
+      */
+     @Nullable
+     @SuppressLint("Doclava125")
+diff --git a/core/java/android/hardware/hdmi/HdmiTvClient.java b/core/java/android/hardware/hdmi/HdmiTvClient.java
+index 9496a27..68edba6 100755
+--- a/core/java/android/hardware/hdmi/HdmiTvClient.java
++++ b/core/java/android/hardware/hdmi/HdmiTvClient.java
+@@ -36,7 +36,7 @@ import java.util.List;
+  * @hide
+  */
+ @SystemApi
+-public final class HdmiTvClient extends HdmiClient {
++public class HdmiTvClient extends HdmiClient {
+     private static final String TAG = "HdmiTvClient";
+ 
+     IHdmiInputChangeListener mInputChangeListener;
+-- 
+2.7.4
+

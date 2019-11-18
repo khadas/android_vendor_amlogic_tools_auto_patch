@@ -1,0 +1,41 @@
+From 77bdfe7dd50146d9617f9d02d91c88d49cda396e Mon Sep 17 00:00:00 2001
+From: Jinping Wang <jinping.wang@amlogic.com>
+Date: Mon, 6 May 2019 17:21:04 +0800
+Subject: [PATCH] cec: cec all patch [1/1]
+
+PD# SWPL-7976
+
+Problem:
+tv maybe Active Source when boot up or cec enabled
+
+Solution:
+tv should send <Request Active Source> when boot up or cec enabled
+
+Verify:
+verify by p321
+
+Change-Id: I6320d209b9fc41c0e2726beb97db04336183af57
+Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
+---
+ services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
+index 157928a..f03784b 100644
+--- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
++++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
+@@ -1501,8 +1501,11 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+             setActivePath(activePath);
+             if (!routingForBootup
+                     && !mDelayedMessageBuffer.isBuffered(Constants.MESSAGE_ACTIVE_SOURCE)) {
++                mService.sendCecCommand(HdmiCecMessageBuilder.buildRequestActiveSource(mAddress));
++                /*
+                 mService.sendCecCommand(HdmiCecMessageBuilder.buildActiveSource(mAddress,
+                         activePath));
++                */
+             }
+         }
+     }
+-- 
+2.10.2
+
