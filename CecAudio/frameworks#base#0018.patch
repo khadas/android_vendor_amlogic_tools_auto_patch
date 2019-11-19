@@ -1,6 +1,6 @@
-From e77cf9d8456c73578abe1ff81595ca08fd5c7c5b Mon Sep 17 00:00:00 2001
-From: Chaomin Zheng <chaomin.zheng@amlogic.com>
-Date: Wed, 5 Jun 2019 12:15:54 +0800
+From e014baf4238dd2593eefb348eec0e93b62bab520 Mon Sep 17 00:00:00 2001
+From: Lei Qian <lei.qian@amlogic.com>
+Date: Thu, 4 Jul 2019 16:18:56 +0800
 Subject: [PATCH] Arc: adjust request short audio descriptor [1/1]
 
 PD# SWPL-9369
@@ -14,20 +14,20 @@ adjust request short audio descriptor
 Verify:
 verify by x301
 
-Change-Id: Ib06cd42c6ca48a6c830da59ab73bf9d1d231b986
-Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
+Change-Id: Ic3b02a9e55dbd4fc1bf009e85261842283288312
+Signed-off-by: Lei Qian <lei.qian@amlogic.com>
 ---
  .../com/android/server/hdmi/HdmiCecController.java |   3 +
  .../android/server/hdmi/HdmiCecLocalDevice.java    |   2 +-
- .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 104 +++++++++++++++++----
+ .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 103 +++++++++++++++++----
  .../hdmi/RequestShortAudioDescriptorAction.java    |   1 +
- 4 files changed, 91 insertions(+), 19 deletions(-)
+ 4 files changed, 90 insertions(+), 19 deletions(-)
 
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecController.java b/services/core/java/com/android/server/hdmi/HdmiCecController.java
-index 4432945..d73dfc1 100644
+index fe1dc64..ae919af 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecController.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecController.java
-@@ -570,6 +570,9 @@ final class HdmiCecController {
+@@ -557,6 +557,9 @@ final class HdmiCecController {
          if (isAcceptableAddress(message.getDestination()) && mService.handleCecCommand(message)) {
              return;
          }
@@ -38,20 +38,20 @@ index 4432945..d73dfc1 100644
          maySendFeatureAbortCommand(message, Constants.ABORT_UNRECOGNIZED_OPCODE);
      }
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
-index 00569a9..51af588 100644
+index a31860c..21f889e 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevice.java
-@@ -146,7 +146,7 @@ abstract class HdmiCecLocalDevice {
+@@ -129,7 +129,7 @@ abstract class HdmiCecLocalDevice {
      // Note that access to this collection should happen in service thread.
      private final ArrayList<HdmiCecFeatureAction> mActions = new ArrayList<>();
  
--    private final Handler mHandler =
-+    protected final Handler mHandler =
-             new Handler() {
-                 @Override
-                 public void handleMessage(Message msg) {
+-    private final Handler mHandler = new Handler () {
++    protected final Handler mHandler = new Handler () {
+         @Override
+         public void handleMessage(Message msg) {
+             switch (msg.what) {
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-index ec6b9b1..5f8ce1c 100644
+index e8f44a3..75cd4ec 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 @@ -83,6 +83,20 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
@@ -170,12 +170,11 @@ index ec6b9b1..5f8ce1c 100644
              mService.getAudioManager().setParameters("set_ARC_format=[2, 0, 0, 0, 0]");
              mService.getAudioManager().setParameters("set_ARC_format=[7, 0, 0, 0, 0]");
              mService.getAudioManager().setParameters("set_ARC_format=[10, 0, 0, 0, 0]");
-@@ -932,12 +963,22 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -932,12 +963,21 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
                      + "because the System Audio Control feature is disabled.");
              return;
          }
 -        if (getAvrDeviceInfo() == null) {
-+
 +        HdmiDeviceInfo avr = getAvrDeviceInfo();
 +        if (avr == null || mSkipSendRequestSystemAudioMode) {
              enableSystemAudio = false;
@@ -195,7 +194,7 @@ index ec6b9b1..5f8ce1c 100644
          mService.sendCecCommand(command, new HdmiControlService.SendMessageCallback() {
              @Override
              public void onSendCompleted(int error) {
-@@ -953,11 +994,14 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -953,11 +993,14 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
          assertRunOnServiceThread();
          if (isBluetoothOrUsbOutDevices() && on) return;
          if (!hasSystemAudioDevice() || mSystemAudioActivated == on) {
@@ -211,7 +210,7 @@ index ec6b9b1..5f8ce1c 100644
              mSystemAudioActivated = on;
              mService.writeBooleanSetting(Global.HDMI_SYSTEM_AUDIO_STATUS_ENABLED, on);
              updateAudioDevicesStatus(on);
-@@ -988,6 +1032,9 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -988,6 +1031,9 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
                  changeArcFeatureEnabled(port.getId(), enabled);
              }
          }
@@ -221,7 +220,7 @@ index ec6b9b1..5f8ce1c 100644
      }
  
      boolean isSystemAudioControlFeatureEnabled() {
-@@ -1086,6 +1133,9 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -1086,6 +1132,9 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
          }
          if (enabled && !mArcEstablished) {
              startArcAction(true);
@@ -231,7 +230,7 @@ index ec6b9b1..5f8ce1c 100644
          } else if (!enabled && mArcEstablished) {
              startArcAction(false);
          }
-@@ -1203,6 +1253,15 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -1203,6 +1252,15 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
          removeAction(VolumeControlAction.class);
          sendUserControlPressedAndReleased(getAvrDeviceInfo().getLogicalAddress(),
                  HdmiCecKeycode.getMuteKey(mute));
@@ -247,7 +246,7 @@ index ec6b9b1..5f8ce1c 100644
      }
  
      @Override
-@@ -1286,6 +1345,15 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -1286,6 +1344,15 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
              mService.maySendFeatureAbortCommand(message, Constants.ABORT_REFUSED);
              return true;
          }
@@ -276,5 +275,5 @@ index fcefcce..10f77b9 100644
      }
  
 -- 
-2.7.4
+1.9.1
 

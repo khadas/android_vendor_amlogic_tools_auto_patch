@@ -1,6 +1,6 @@
-From b89363e50315c4a858415c60d12ec5276f80d8c5 Mon Sep 17 00:00:00 2001
-From: Chaomin Zheng <chaomin.zheng@amlogic.com>
-Date: Tue, 16 Jul 2019 10:50:09 +0800
+From 922027a2c89cf7041996b5411f90a29adc81213b Mon Sep 17 00:00:00 2001
+From: Lei Qian <lei.qian@amlogic.com>
+Date: Thu, 18 Jul 2019 11:34:02 +0800
 Subject: [PATCH] Arc: change system audio mode request cmd parameter [1/1]
 
 PD# SWPL-7878
@@ -14,14 +14,14 @@ change system audio mode request cmd parameter
 Verify:
 verify by x301
 
-Change-Id: Ia7beea4484ec999094b4557e945c7ed01a840924
-Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
+Change-Id: Ic4376d02c38fe49d50b4ec2639372f4e5f51f8da
+Signed-off-by: Lei Qian <lei.qian@amlogic.com>
 ---
- .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 22 +++-------------------
- 1 file changed, 3 insertions(+), 19 deletions(-)
+ .../android/server/hdmi/HdmiCecLocalDeviceTv.java   | 21 +++------------------
+ 1 file changed, 3 insertions(+), 18 deletions(-)
 
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-index 5f8ce1c..74329d8 100644
+index 75cd4ec..b09a639 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 @@ -87,8 +87,6 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
@@ -33,7 +33,7 @@ index 5f8ce1c..74329d8 100644
      private Runnable mUnMuteSpeakerRunnable = new Runnable() {
  
          @Override
-@@ -958,27 +956,15 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -958,26 +956,15 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      }
  
      private void sendSystemAudioModeRequest(boolean enableSystemAudio) {
@@ -42,7 +42,6 @@ index 5f8ce1c..74329d8 100644
 -                    + "because the System Audio Control feature is disabled.");
 -            return;
 -        }
--
          HdmiDeviceInfo avr = getAvrDeviceInfo();
          if (avr == null || mSkipSendRequestSystemAudioMode) {
              enableSystemAudio = false;
@@ -62,7 +61,7 @@ index 5f8ce1c..74329d8 100644
          mService.sendCecCommand(command, new HdmiControlService.SendMessageCallback() {
              @Override
              public void onSendCompleted(int error) {
-@@ -1343,6 +1329,8 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -1342,6 +1329,8 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
              HdmiLogger.debug("Ignoring <Set System Audio Mode> message "
                      + "because the System Audio Control feature is disabled: %s", message);
              mService.maySendFeatureAbortCommand(message, Constants.ABORT_REFUSED);
@@ -71,7 +70,7 @@ index 5f8ce1c..74329d8 100644
              return true;
          }
          if (systemAudioStatus) {
-@@ -1350,10 +1338,6 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -1349,10 +1338,6 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
          } else {
              mSkipSendRequestSystemAudioMode = true;
          }
@@ -83,5 +82,5 @@ index 5f8ce1c..74329d8 100644
          SystemAudioActionFromAvr action = new SystemAudioActionFromAvr(this,
                  message.getSource(), systemAudioStatus, null);
 -- 
-2.7.4
+1.9.1
 

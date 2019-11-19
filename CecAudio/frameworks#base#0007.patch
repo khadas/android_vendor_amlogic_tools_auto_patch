@@ -1,37 +1,44 @@
-From ef838f998935c2c5a2899fa9fa417fdefcde4c1a Mon Sep 17 00:00:00 2001
+From 88b4f6ce509815614323920a755b5c6d358702d6 Mon Sep 17 00:00:00 2001
 From: Jinping Wang <jinping.wang@amlogic.com>
-Date: Wed, 1 Aug 2018 18:53:25 +0800
-Subject: [PATCH] cec: add pass through for playback [1/2]
+Date: Wed, 13 Nov 2019 13:51:21 +0800
+Subject: [PATCH] cec: add pass through for playback [1/1]
 
-PD#170574
+PD# SWPL-16560
 
-add pass through for playback
+Problem:
+playback volumekey should pass through when hdmicecsink enabled
 
-Change-Id: I50b460f8cd1b861894a6df420e24f0a4239d44e2
+Solution:
+playback volumekey pass through
+
+Verify:
+test ok using fermi
+
+Change-Id: I2c11340dbe3b95076399e1b8cf26c2096989043a
+Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
 ---
- .../com/android/server/audio/AudioService.java     | 41 +++++++++++++++++++++-
- 1 file changed, 40 insertions(+), 1 deletion(-)
+ .../com/android/server/audio/AudioService.java     | 39 ++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
 diff --git a/services/core/java/com/android/server/audio/AudioService.java b/services/core/java/com/android/server/audio/AudioService.java
-index d1de55d..67e5365 100644
+index 37c7ee7..c953f0c 100644
 --- a/services/core/java/com/android/server/audio/AudioService.java
 +++ b/services/core/java/com/android/server/audio/AudioService.java
-@@ -155,7 +155,10 @@ import java.util.Iterator;
+@@ -156,6 +156,10 @@ import java.util.Iterator;
  import java.util.List;
  import java.util.NoSuchElementException;
  import java.util.Objects;
--
 +import android.provider.Settings;
 +import android.app.AlertDialog;
 +import android.app.AlertDialog.Builder;
 +import android.view.WindowManager;
+ 
  /**
   * The implementation of the volume manager service.
-  * <p>
-@@ -1683,6 +1686,42 @@ public class AudioService extends IAudioService.Stub
+@@ -1684,6 +1688,41 @@ public class AudioService extends IAudioService.Stub
+ 
          if (adjustVolume && (direction != AudioManager.ADJUST_SAME)) {
              mAudioHandler.removeMessages(MSG_UNMUTE_STREAM);
- 
 +            boolean routePassthroughVolume = SystemProperties.getBoolean("audio.passthrough.volume.route2cec", false)
 +                    && SystemProperties.getBoolean("audio.passthrough.enable", false);
 +            boolean hdmiControlEnabled = (Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HDMI_CONTROL_ENABLED, 1) == 1);
@@ -67,10 +74,9 @@ index d1de55d..67e5365 100644
 +                    });
 +                }
 +            }
-+
+ 
              if (isMuteAdjust) {
                  boolean state;
-                 if (direction == AudioManager.ADJUST_TOGGLE_MUTE) {
 -- 
-1.9.1
+2.10.2
 

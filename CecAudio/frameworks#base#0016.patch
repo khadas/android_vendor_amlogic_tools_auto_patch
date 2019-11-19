@@ -1,6 +1,6 @@
-From be246d6565f58c716448ee3ffa6cf70ec9b48ab2 Mon Sep 17 00:00:00 2001
-From: Chaomin Zheng <chaomin.zheng@amlogic.com>
-Date: Fri, 31 May 2019 20:26:35 +0800
+From 3c0b17c7011466ccd0718edc562ebc0556623125 Mon Sep 17 00:00:00 2001
+From: Lei Qian <lei.qian@amlogic.com>
+Date: Sat, 1 Jun 2019 15:22:28 +0800
 Subject: [PATCH] Arc: update hdmi system audio request staus [1/1]
 
 PD# TV-6174
@@ -14,8 +14,8 @@ Solution:
 Verify:
 verify by x301
 
-Change-Id: Ie6ee2a2d04122c9e476714c9101a67cc6042ef23
-Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
+Change-Id: Ia74f2eeef4a01a745e51d0bcd99587737d4ac8f0
+Signed-off-by: Lei Qian <lei.qian@amlogic.com>
 ---
  .../android/server/hdmi/HdmiCecLocalDeviceTv.java  | 17 ++++----
  .../server/hdmi/RequestArcInitiationAction.java    | 46 ----------------------
@@ -24,7 +24,7 @@ Signed-off-by: Chaomin Zheng <chaomin.zheng@amlogic.com>
  4 files changed, 18 insertions(+), 56 deletions(-)
 
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-index a3c334f..ec6b9b1 100644
+index 9b3fc14..e8f44a3 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 @@ -927,12 +927,17 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
@@ -128,7 +128,7 @@ index e411e21..0be9542 100644
 -    }
  }
 diff --git a/services/core/java/com/android/server/hdmi/SystemAudioAction.java b/services/core/java/com/android/server/hdmi/SystemAudioAction.java
-index a5477e8..f4f2eec 100644
+index 449b208..3a7e941 100644
 --- a/services/core/java/com/android/server/hdmi/SystemAudioAction.java
 +++ b/services/core/java/com/android/server/hdmi/SystemAudioAction.java
 @@ -90,6 +90,11 @@ abstract class SystemAudioAction extends HdmiCecFeatureAction {
@@ -153,12 +153,12 @@ index a5477e8..f4f2eec 100644
                  }
              }
 diff --git a/services/core/java/com/android/server/hdmi/SystemAudioStatusAction.java b/services/core/java/com/android/server/hdmi/SystemAudioStatusAction.java
-index df94d67..9bde737 100644
+index 742c024..f0938bd 100644
 --- a/services/core/java/com/android/server/hdmi/SystemAudioStatusAction.java
 +++ b/services/core/java/com/android/server/hdmi/SystemAudioStatusAction.java
 @@ -68,12 +68,12 @@ final class SystemAudioStatusAction extends HdmiCecFeatureAction {
      private void handleSendGiveAudioStatusFailure() {
-         // Inform to all application that the audio status (volume, mute) of
+         // Inform to all application that the audio status (volumn, mute) of
          // the audio amplifier is unknown.
 -        tv().setAudioStatus(false, Constants.UNKNOWN_VOLUME);
 +        /* tv().setAudioStatus(false, Constants.UNKNOWN_VOLUME);
@@ -172,5 +172,6 @@ index df94d67..9bde737 100644
          // Still return SUCCESS to callback.
          finishWithCallback(HdmiControlManager.RESULT_SUCCESS);
 -- 
-2.7.4
+1.9.1
+
 

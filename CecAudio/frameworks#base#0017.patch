@@ -1,20 +1,20 @@
-From a838c6a408ea14086d258454151576157f9510ff Mon Sep 17 00:00:00 2001
+From bb5bc3d1b2269004e4da920a546eb3a72dd75459 Mon Sep 17 00:00:00 2001
 From: Jinping Wang <jinping.wang@amlogic.com>
-Date: Wed, 19 Jun 2019 14:08:54 +0800
-Subject: [PATCH] cec: support otp [1/1]
+Date: Thu, 20 Jun 2019 13:23:19 +0800
+Subject: [PATCH] cec: support otp when hot plug [1/1]
 
 PD# SWPL-9793
 
 Problem:
-should trigger otp when hot plug in
+11.2.1-1 not pass
 
 Solution:
-should trigger otp when hot plug in
+support otp when hot plug in
 
 Verify:
-test ok using p212
+test ok using p321
 
-Change-Id: I3b485f087d0758d52a2832afef26f437731fe3db
+Change-Id: I01cfae20edff9d0052cbc54c2a96f612fcef61bd
 Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
 ---
  .../com/android/server/hdmi/HdmiCecLocalDevicePlayback.java   | 11 +++++++++--
@@ -22,10 +22,10 @@ Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
  2 files changed, 14 insertions(+), 7 deletions(-)
 
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
-index 70a88e7..c70bb7a 100644
+index dc2c764..7a3dd2e 100644
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDevicePlayback.java
-@@ -87,6 +87,12 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+@@ -81,6 +81,12 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
          mService.sendCecCommand(HdmiCecMessageBuilder.buildDeviceVendorIdCommand(
                  mAddress, mService.getVendorId()));
          startQueuedActions();
@@ -38,7 +38,7 @@ index 70a88e7..c70bb7a 100644
      }
  
      @Override
-@@ -111,8 +117,9 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
+@@ -105,8 +111,9 @@ final class HdmiCecLocalDevicePlayback extends HdmiCecLocalDevice {
          List<OneTouchPlayAction> actions = getActions(OneTouchPlayAction.class);
          if (!actions.isEmpty()) {
              Slog.i(TAG, "oneTouchPlay already in progress");

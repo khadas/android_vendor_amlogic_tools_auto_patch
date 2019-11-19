@@ -1,6 +1,6 @@
-From 17800aaf09c88a906646565a86bb09b5e64b8a59 Mon Sep 17 00:00:00 2001
+From 05e01b535d0ecec4f3456e707c3ec448c885b719 Mon Sep 17 00:00:00 2001
 From: xian <an.xi@amlogic.com>
-Date: Thu, 24 Oct 2019 10:27:48 +0800
+Date: Wed, 23 Oct 2019 20:31:35 +0800
 Subject: [PATCH] SystemServer: show volume bar when arc enabled [1/1]
 
 PD#SWPL-14697
@@ -23,11 +23,11 @@ Signed-off-by: xian <an.xi@amlogic.com>
  1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/services/core/java/com/android/server/audio/AudioService.java b/services/core/java/com/android/server/audio/AudioService.java
-index af7d7f3..3599faf 100644
+index 13de652..fb2f59a 100644
 --- a/services/core/java/com/android/server/audio/AudioService.java
 +++ b/services/core/java/com/android/server/audio/AudioService.java
-@@ -2233,7 +2233,10 @@ public class AudioService extends IAudioService.Stub
-             if (mHdmiTvClient != null) {
+@@ -2169,7 +2169,10 @@ public class AudioService extends IAudioService.Stub
+             synchronized (mHdmiTvClient) {
                  if (mHdmiSystemAudioSupported &&
                          ((flags & AudioManager.FLAG_HDMI_SYSTEM_AUDIO_VOLUME) == 0)) {
 -                    flags &= ~AudioManager.FLAG_SHOW_UI;

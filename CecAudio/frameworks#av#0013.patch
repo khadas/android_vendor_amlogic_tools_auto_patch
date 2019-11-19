@@ -1,6 +1,6 @@
-From 2decc3d1c75bf3993ac34606d0b8e7575eedf70e Mon Sep 17 00:00:00 2001
+From 2e89675098744c6ee25b7b7ab8eab2824b2f8216 Mon Sep 17 00:00:00 2001
 From: "hongchao.yin" <hongchao.yin@amlogic.com>
-Date: Tue, 22 Oct 2019 16:03:17 +0800
+Date: Tue, 22 Oct 2019 17:21:27 +0800
 Subject: [PATCH] libaudioprocessing: fixed without adjust the channel [1/1]
 
 PD#SWPL-15218
@@ -15,18 +15,23 @@ add upmix and downmix process when 16bit resample
 Verify:
 verify by x301
 
-Change-Id: Idb554be1cdc3bbfe1858dc9b6375e2be58b7e967
+Change-Id: Ie1f71b42e9fe8a4bb16e083276430ee599f3d369
 Signed-off-by: hongchao.yin <hongchao.yin@amlogic.com>
 ---
- media/libaudioprocessing/RecordBufferConverter.cpp | 97 ++++++++++++++++++----
- .../libmedia/include/media/RecordBufferConverter.h |  2 +
- 2 files changed, 84 insertions(+), 15 deletions(-)
+ media/libaudioprocessing/RecordBufferConverter.cpp | 245 +++++++++------------
+ 1 file changed, 106 insertions(+), 139 deletions(-)
 
 diff --git a/media/libaudioprocessing/RecordBufferConverter.cpp b/media/libaudioprocessing/RecordBufferConverter.cpp
-index 54151f5..7e6bcf6 100644
+index 8019393..7e6bcf6 100644
 --- a/media/libaudioprocessing/RecordBufferConverter.cpp
 +++ b/media/libaudioprocessing/RecordBufferConverter.cpp
-@@ -24,6 +24,7 @@
+@@ -19,12 +19,12 @@
+ 
+ #include <audio_utils/primitives.h>
+ #include <audio_utils/format.h>
+-#include <cutils/properties.h>
+ #include <media/AudioMixer.h>  // for UNITY_GAIN_FLOAT
+ #include <media/AudioResampler.h>
  #include <media/BufferProviders.h>
  #include <media/RecordBufferConverter.h>
  #include <utils/Log.h>
@@ -34,12 +39,93 @@ index 54151f5..7e6bcf6 100644
  
  #ifndef ARRAY_SIZE
  #define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
-@@ -114,8 +115,58 @@ size_t RecordBufferConverter::convert(void *dst,
-         // resampler accumulates, but we only have one source track
-         memset(mBuf, 0, frames * mBufFrameSize);
-         frames = mResampler->resample((int32_t*)mBuf, frames, provider);
--        // format convert to destination buffer
--        convertResampler(dst, mBuf, frames);
+@@ -78,11 +78,9 @@ void RecordBufferConverter::reset() {
+ size_t RecordBufferConverter::convert(void *dst,
+         AudioBufferProvider *provider, size_t frames)
+ {
+-    if (!useInt16Resampler()) {
+-        if (mInputConverterProvider != NULL) {
+-            mInputConverterProvider->setBufferProvider(provider);
+-            provider = mInputConverterProvider;
+-        }
++    if (mInputConverterProvider != NULL) {
++        mInputConverterProvider->setBufferProvider(provider);
++        provider = mInputConverterProvider;
+     }
+ 
+     if (mResampler == NULL) {
+@@ -108,65 +106,64 @@ size_t RecordBufferConverter::convert(void *dst,
+          ALOGV("RESAMPLING mSrcSampleRate:%u mDstSampleRate:%u mSrcFormat:%#x mDstFormat:%#x",
+                  mSrcSampleRate, mDstSampleRate, mSrcFormat, mDstFormat);
+ 
+-         if (useInt16Resampler()) {
+-             mBufFrameSize = mDstChannelCount * 4; //fixed-point Q4.27.
+-
+-             // reallocate buffer if needed
+-             if (mBufFrameSize != 0 && mBufFrames < frames) {
+-                 free(mBuf);
+-                 mBufFrames = frames;
+-                 (void)posix_memalign(&mBuf, 32, mBufFrames * mBufFrameSize);
+-                ALOGI("%s,posix_memalign,mBufFrames = %d", __FUNCTION__, mBufFrames);
+-             }
+-             // resampler accumulates, but we only have one source track
+-             memset(mBuf, 0, frames * mBufFrameSize);
+-             frames = mResampler->resample((int32_t*)mBuf, frames, provider);
+-             // format convert to destination buffer
+-             // mono takes left channel only (out of stereo output pair)
+-             // stereo and multichannel preserve all channels.
+-             size_t output_frames = frames;
+-             int channels = mSrcChannelCount;
+-             size_t output_channels = mDstChannelCount;
+-             int32_t* out = (int32_t*) mBuf;
+-             int16_t* convert = (int16_t*) malloc(output_frames * channels * sizeof(int16_t));
+-
+-             const int volumeShift = 12; // shift requirement for Q4.27 to Q.15
+-             // round to half towards zero and saturate at int16 (non-dithered)
+-             const int roundVal = (1 << (volumeShift - 1)) - 1; // volumePrecision > 0
+-
+-             for (size_t i = 0; i < output_frames; i++) {
+-                 for (int j = 0; j < channels; j++) {
+-                     int32_t s = out[i * output_channels + j] + roundVal; // add offset here
+-                     if (s < 0) {
+-                         s = (s + 1) >> volumeShift; // round to 0
+-                         if (s < -32768) {
+-                             s = -32768;
+-                         }
+-                     } else {
+-                         s = s >> volumeShift;
+-                         if (s > 32767) {
+-                             s = 32767;
+-                         }
+-                     }
+-                     convert[i * channels + j] = int16_t(s);
+-                 }
+-             }
+-
+-             memcpy_by_audio_format(dst, mDstFormat, convert, AUDIO_FORMAT_PCM_16_BIT,
+-                     frames * mDstChannelCount);
+-
+-             if (convert)
+-                 free(convert);
+-        } else {//original code
+-             // reallocate buffer if needed
+-             if (mBufFrameSize != 0 && mBufFrames < frames) {
+-                 free(mBuf);
+-                 mBufFrames = frames;
+-                 (void)posix_memalign(&mBuf, 32, mBufFrames * mBufFrameSize);
+-             }
+-            // resampler accumulates, but we only have one source track
+-            memset(mBuf, 0, frames * mBufFrameSize);
+-            frames = mResampler->resample((int32_t*)mBuf, frames, provider);
++         // reallocate buffer if needed
++         if (mBufFrameSize != 0 && mBufFrames < frames) {
++             free(mBuf);
++             mBufFrames = frames;
++             (void)posix_memalign(&mBuf, 32, mBufFrames * mBufFrameSize);
++         }
++        // resampler accumulates, but we only have one source track
++        memset(mBuf, 0, frames * mBufFrameSize);
++        frames = mResampler->resample((int32_t*)mBuf, frames, provider);
 +
 +        if (useInt16Resampler()) {
 +            int32_t* ps32OutData = (int32_t*) mBuf;
@@ -89,92 +175,145 @@ index 54151f5..7e6bcf6 100644
 +                free(pS16FloatTo16Bit);
 +            }
 +        } else {
-+            // format convert to destination buffer
-+            convertResampler(dst, mBuf, frames);
-+        }
-     }
-     return frames;
- }
-@@ -162,12 +213,20 @@ status_t RecordBufferConverter::updateParameters(
+             // format convert to destination buffer
+             convertResampler(dst, mBuf, frames);
+         }
+@@ -216,85 +213,54 @@ status_t RecordBufferConverter::updateParameters(
      mDstChannelCount = audio_channel_count_from_in_mask(dstChannelMask);
      mDstFrameSize = mDstChannelCount * audio_bytes_per_sample(mDstFormat);
  
 +    audio_format_t              enResamplerFormat = AUDIO_FORMAT_PCM_FLOAT;
 +    AudioResampler::src_quality enResamplerQuality = AudioResampler::DEFAULT_QUALITY;
-+    if (useInt16Resampler()) {
+     if (useInt16Resampler()) {
+-        // do we need to resample?
+-        delete mResampler;
+-        mResampler = NULL;
+-        if (mSrcSampleRate != mDstSampleRate) {
+-            mResampler = AudioResampler::create(AUDIO_FORMAT_PCM_16_BIT,
+-                                                mSrcChannelCount, mDstSampleRate, AudioResampler::HIGH_QUALITY);
+-            mResampler->setSampleRate(mSrcSampleRate);
+-            mResampler->setVolume(AudioMixer::UNITY_GAIN_FLOAT, AudioMixer::UNITY_GAIN_FLOAT);
+-        }
 +        enResamplerFormat = AUDIO_FORMAT_PCM_16_BIT;
 +        enResamplerQuality = AudioResampler::HIGH_QUALITY;
 +
 +    }
-+
-     // do we need to resample?
-     delete mResampler;
-     mResampler = NULL;
-     if (mSrcSampleRate != mDstSampleRate) {
--        mResampler = AudioResampler::create(AUDIO_FORMAT_PCM_FLOAT,
--                mSrcChannelCount, mDstSampleRate);
+ 
+-        // are we running legacy channel conversion modes?
+-        mIsLegacyDownmix = (mSrcChannelMask == AUDIO_CHANNEL_IN_STEREO
++    // do we need to resample?
++    delete mResampler;
++    mResampler = NULL;
++    if (mSrcSampleRate != mDstSampleRate) {
 +        mResampler = AudioResampler::create(enResamplerFormat,
 +                mSrcChannelCount, mDstSampleRate, enResamplerQuality);
-         mResampler->setSampleRate(mSrcSampleRate);
-         mResampler->setVolume(AudioMixer::UNITY_GAIN_FLOAT, AudioMixer::UNITY_GAIN_FLOAT);
-     }
-@@ -200,18 +259,21 @@ status_t RecordBufferConverter::updateParameters(
-     // do we need an input converter buffer provider to give us float?
-     delete mInputConverterProvider;
-     mInputConverterProvider = NULL;
--    if (mRequiresFloat && mSrcFormat != AUDIO_FORMAT_PCM_FLOAT) {
--        mInputConverterProvider = new ReformatBufferProvider(
--                audio_channel_count_from_in_mask(mSrcChannelMask),
--                mSrcFormat,
--                AUDIO_FORMAT_PCM_FLOAT,
--                256 /* provider buffer frame count */);
--    }
- 
--    // do we need a remixer to do channel mask conversion
--    if (!mIsLegacyDownmix && !mIsLegacyUpmix && mSrcChannelMask != mDstChannelMask) {
--        (void) memcpy_by_index_array_initialization_from_channel_mask(
--                mIdxAry, ARRAY_SIZE(mIdxAry), mDstChannelMask, mSrcChannelMask);
-+    if (!useInt16Resampler()) {
-+        if (mRequiresFloat && mSrcFormat != AUDIO_FORMAT_PCM_FLOAT) {
-+            mInputConverterProvider = new ReformatBufferProvider(
-+                    audio_channel_count_from_in_mask(mSrcChannelMask),
-+                    mSrcFormat,
-+                    AUDIO_FORMAT_PCM_FLOAT,
-+                    256 /* provider buffer frame count */);
-+        }
++        mResampler->setSampleRate(mSrcSampleRate);
++        mResampler->setVolume(AudioMixer::UNITY_GAIN_FLOAT, AudioMixer::UNITY_GAIN_FLOAT);
++    }
 +
-+        // do we need a remixer to do channel mask conversion
-+        if (!mIsLegacyDownmix && !mIsLegacyUpmix && mSrcChannelMask != mDstChannelMask) {
-+            (void) memcpy_by_index_array_initialization_from_channel_mask(
-+                    mIdxAry, ARRAY_SIZE(mIdxAry), mDstChannelMask, mSrcChannelMask);
-+        }
-     }
-     return NO_ERROR;
- }
-@@ -290,5 +352,10 @@ void RecordBufferConverter::convertResampler(
-             frames * mDstChannelCount);
- }
++    // are we running legacy channel conversion modes?
++    mIsLegacyDownmix = (mSrcChannelMask == AUDIO_CHANNEL_IN_STEREO
+                             || mSrcChannelMask == AUDIO_CHANNEL_IN_FRONT_BACK)
+-                           && mDstChannelMask == AUDIO_CHANNEL_IN_MONO;
+-        mIsLegacyUpmix = mSrcChannelMask == AUDIO_CHANNEL_IN_MONO
+-                         && (mDstChannelMask == AUDIO_CHANNEL_IN_STEREO
+-                             || mDstChannelMask == AUDIO_CHANNEL_IN_FRONT_BACK);
+-
+-        // do we need to process in float?
+-        mRequiresFloat = mResampler != NULL || mIsLegacyDownmix || mIsLegacyUpmix;
+-
+-        // do we need a staging buffer to convert for destination (we can still optimize this)?
+-        // we use mBufFrameSize > 0 to indicate both frame size as well as buffer necessity
+-        if (mResampler != NULL) {
+-            mBufFrameSize = max(mSrcChannelCount, (uint32_t)FCC_2)
+-                            * audio_bytes_per_sample(AUDIO_FORMAT_PCM_16_BIT);
+-        } else if (mIsLegacyUpmix || mIsLegacyDownmix) { // legacy modes always float
+-            mBufFrameSize = mDstChannelCount * audio_bytes_per_sample(AUDIO_FORMAT_PCM_16_BIT);
+-        } else if (mSrcChannelMask != mDstChannelMask && mDstFormat != mSrcFormat) {
+-            mBufFrameSize = mDstChannelCount * audio_bytes_per_sample(mSrcFormat);
+-        } else {
+-            mBufFrameSize = 0;
+-        }
+-        mBufFrames = 0; // force the buffer to be resized.
+-
+-        // do we need an input converter buffer provider to give us float?
+-        delete mInputConverterProvider;
+-        mInputConverterProvider = NULL;
+-
+-    } else { //original code
+-        // do we need to resample?
+-        delete mResampler;
+-        mResampler = NULL;
+-        if (mSrcSampleRate != mDstSampleRate) {
+-            mResampler = AudioResampler::create(AUDIO_FORMAT_PCM_FLOAT,
+-                    mSrcChannelCount, mDstSampleRate);
+-            mResampler->setSampleRate(mSrcSampleRate);
+-            mResampler->setVolume(AudioMixer::UNITY_GAIN_FLOAT, AudioMixer::UNITY_GAIN_FLOAT);
+-        }
++                   && mDstChannelMask == AUDIO_CHANNEL_IN_MONO;
++    mIsLegacyUpmix = mSrcChannelMask == AUDIO_CHANNEL_IN_MONO
++                   && (mDstChannelMask == AUDIO_CHANNEL_IN_STEREO
++                            || mDstChannelMask == AUDIO_CHANNEL_IN_FRONT_BACK);
  
-+bool RecordBufferConverter::useInt16Resampler() {
-+    return (property_get_int32("persist.sys.useint16resampler", 1) == 1) &&
-+            (mSrcSampleRate <= 48000);
-+}
+-        // are we running legacy channel conversion modes?
+-        mIsLegacyDownmix = (mSrcChannelMask == AUDIO_CHANNEL_IN_STEREO
+-                                || mSrcChannelMask == AUDIO_CHANNEL_IN_FRONT_BACK)
+-                       && mDstChannelMask == AUDIO_CHANNEL_IN_MONO;
+-        mIsLegacyUpmix = mSrcChannelMask == AUDIO_CHANNEL_IN_MONO
+-                       && (mDstChannelMask == AUDIO_CHANNEL_IN_STEREO
+-                                || mDstChannelMask == AUDIO_CHANNEL_IN_FRONT_BACK);
+-
+-        // do we need to process in float?
+-        mRequiresFloat = mResampler != NULL || mIsLegacyDownmix || mIsLegacyUpmix;
+-
+-        // do we need a staging buffer to convert for destination (we can still optimize this)?
+-        // we use mBufFrameSize > 0 to indicate both frame size as well as buffer necessity
+-        if (mResampler != NULL) {
+-            mBufFrameSize = max(mSrcChannelCount, (uint32_t)FCC_2)
+-                    * audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT);
+-        } else if (mIsLegacyUpmix || mIsLegacyDownmix) { // legacy modes always float
+-            mBufFrameSize = mDstChannelCount * audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT);
+-        } else if (mSrcChannelMask != mDstChannelMask && mDstFormat != mSrcFormat) {
+-            mBufFrameSize = mDstChannelCount * audio_bytes_per_sample(mSrcFormat);
+-        } else {
+-            mBufFrameSize = 0;
+-        }
+-        mBufFrames = 0; // force the buffer to be resized.
++    // do we need to process in float?
++    mRequiresFloat = mResampler != NULL || mIsLegacyDownmix || mIsLegacyUpmix;
+ 
+-        // do we need an input converter buffer provider to give us float?
+-        delete mInputConverterProvider;
+-        mInputConverterProvider = NULL;
++    // do we need a staging buffer to convert for destination (we can still optimize this)?
++    // we use mBufFrameSize > 0 to indicate both frame size as well as buffer necessity
++    if (mResampler != NULL) {
++        mBufFrameSize = max(mSrcChannelCount, (uint32_t)FCC_2)
++                * audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT);
++    } else if (mIsLegacyUpmix || mIsLegacyDownmix) { // legacy modes always float
++        mBufFrameSize = mDstChannelCount * audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT);
++    } else if (mSrcChannelMask != mDstChannelMask && mDstFormat != mSrcFormat) {
++        mBufFrameSize = mDstChannelCount * audio_bytes_per_sample(mSrcFormat);
++    } else {
++        mBufFrameSize = 0;
++    }
++    mBufFrames = 0; // force the buffer to be resized.
++
++    // do we need an input converter buffer provider to give us float?
++    delete mInputConverterProvider;
++    mInputConverterProvider = NULL;
++
++    if (!useInt16Resampler()) {
+         if (mRequiresFloat && mSrcFormat != AUDIO_FORMAT_PCM_FLOAT) {
+             mInputConverterProvider = new ReformatBufferProvider(
+                     audio_channel_count_from_in_mask(mSrcChannelMask),
+@@ -390,5 +356,6 @@ bool RecordBufferConverter::useInt16Resampler() {
+     return (property_get_int32("persist.sys.useint16resampler", 1) == 1) &&
+             (mSrcSampleRate <= 48000);
+ }
 +
  // ----------------------------------------------------------------------------
  } // namespace android
-diff --git a/media/libmedia/include/media/RecordBufferConverter.h b/media/libmedia/include/media/RecordBufferConverter.h
-index 2abc45e..151ada5 100644
---- a/media/libmedia/include/media/RecordBufferConverter.h
-+++ b/media/libmedia/include/media/RecordBufferConverter.h
-@@ -85,6 +85,8 @@ private:
-     // format conversion when using resampler; modifies src in-place
-     void convertResampler(void *dst, /*not-a-const*/ void *src, size_t frames);
- 
-+    bool useInt16Resampler();
-+
-     // user provided information
-     audio_channel_mask_t mSrcChannelMask;
-     audio_format_t       mSrcFormat;
 -- 
 1.9.1
 

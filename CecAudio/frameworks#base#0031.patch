@@ -1,6 +1,6 @@
-From fa55c895aa21499dfeaa88cb37acd749c7902c20 Mon Sep 17 00:00:00 2001
+From e5c468aca6c3fbbdfdedff27117f84241d16174d Mon Sep 17 00:00:00 2001
 From: xian <an.xi@amlogic.com>
-Date: Tue, 15 Oct 2019 02:24:39 -0400
+Date: Tue, 15 Oct 2019 06:56:41 -0400
 Subject: [PATCH] SystemServer: fix tv select source slow issue [1/1]
 
 PD#SWPL-11187
@@ -12,10 +12,10 @@ Solution:
 Use apart device detect action to poll cec devices
 
 Verify:
-verify it on Marconi 
+verify it on Marconi
 
-Change-Id: I2234ca2c0cd75e047990c9a89231846ae7852a26
-Signed-off-by: xian <an.xi@amlogic.com>
+Change-Id: I5d8f980fe641823077edd167472124bd85e4b589
+Signed-off-by: an.xi <an.xi@amlogic.com>
 ---
  .../server/hdmi/ApartDeviceDiscoveryAction.java    | 360 +++++++++++++++++++++
  .../android/server/hdmi/DeviceDiscoveryAction.java |  51 +--
@@ -397,7 +397,7 @@ index 0000000..a0abe42
 +
 +}
 diff --git a/services/core/java/com/android/server/hdmi/DeviceDiscoveryAction.java b/services/core/java/com/android/server/hdmi/DeviceDiscoveryAction.java
-index b5ba17f..574fc01 100644
+index dbb7037..75a3474 100755
 --- a/services/core/java/com/android/server/hdmi/DeviceDiscoveryAction.java
 +++ b/services/core/java/com/android/server/hdmi/DeviceDiscoveryAction.java
 @@ -40,17 +40,19 @@ import java.util.List;
@@ -476,7 +476,7 @@ index b5ba17f..574fc01 100644
  
      /**
       * Constructor.
-@@ -141,7 +144,7 @@ final class DeviceDiscoveryAction extends HdmiCecFeatureAction {
+@@ -140,7 +143,7 @@ final class DeviceDiscoveryAction extends HdmiCecFeatureAction {
          checkAndProceedStage();
      }
  
@@ -485,7 +485,7 @@ index b5ba17f..574fc01 100644
          return address >= Constants.ADDR_TV && address < Constants.ADDR_UNREGISTERED;
      }
  
-@@ -209,7 +212,7 @@ final class DeviceDiscoveryAction extends HdmiCecFeatureAction {
+@@ -208,7 +211,7 @@ final class DeviceDiscoveryAction extends HdmiCecFeatureAction {
          addTimer(mState, HdmiConfig.TIMEOUT_MS);
      }
  
@@ -494,7 +494,7 @@ index b5ba17f..574fc01 100644
          HdmiCecMessage message = getCecMessageCache().getMessage(address, opcode);
          if (message != null) {
              processCommand(message);
-@@ -279,7 +282,7 @@ final class DeviceDiscoveryAction extends HdmiCecFeatureAction {
+@@ -278,7 +281,7 @@ final class DeviceDiscoveryAction extends HdmiCecFeatureAction {
          checkAndProceedStage();
      }
  
@@ -503,7 +503,7 @@ index b5ba17f..574fc01 100644
          return mIsTvDevice ? tv().getPortId(physicalAddress)
              : (mIsAudioSystemDevice ? audioSystem().getPortId(physicalAddress)
              : Constants.INVALID_PORT_ID);
-@@ -337,11 +340,11 @@ final class DeviceDiscoveryAction extends HdmiCecFeatureAction {
+@@ -336,11 +339,11 @@ final class DeviceDiscoveryAction extends HdmiCecFeatureAction {
          mTimeoutRetry = 0;
      }
  
@@ -602,11 +602,11 @@ index 11faa56..b57fa03
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceAudioSystem.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceAudioSystem.java
 old mode 100644
 new mode 100755
-index 566d0ba..ec813b3
+index 932bcc4..75dfded
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceAudioSystem.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceAudioSystem.java
-@@ -1335,6 +1335,9 @@ public class HdmiCecLocalDeviceAudioSystem extends HdmiCecLocalDevice {
-                         addCecDevice(info);
+@@ -328,6 +328,9 @@ public class HdmiCecLocalDeviceAudioSystem extends HdmiCecLocalDevice {
+                         addDeviceInfo(info);
                      }
                  }
 +                @Override
@@ -616,10 +616,10 @@ index 566d0ba..ec813b3
          addAndStartAction(action);
      }
 diff --git a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-index 1d040bd..6953f49 100644
+index 06c68af..e2df4af 100755
 --- a/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiCecLocalDeviceTv.java
-@@ -589,7 +589,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -593,7 +593,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
          if (updateCecSwitchInfo(address, type, path)) return true;
  
          // Ignore if [Device Discovery Action] is going on.
@@ -628,7 +628,7 @@ index 1d040bd..6953f49 100644
              Slog.i(TAG, "Ignored while Device Discovery Action is in progress: " + message);
              return true;
          }
-@@ -793,14 +793,10 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -798,14 +798,10 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      private void launchDeviceDiscovery() {
          assertRunOnServiceThread();
          clearDeviceInfoList();
@@ -644,7 +644,7 @@ index 1d040bd..6953f49 100644
                          // Since we removed all devices when it's start and
                          // device discovery action does not poll local devices,
                          // we should put device info of local device manually here
-@@ -811,20 +807,43 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -816,20 +812,43 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
                          mSelectRequestBuffer.process();
                          resetSelectRequestBuffer();
  
@@ -694,7 +694,7 @@ index 1d040bd..6953f49 100644
      void turnOnAvrDevice(HdmiDeviceInfo avr) {
          HdmiCecMessage msg = HdmiCecMessageBuilder.buildSystemAudioModeRequest(
                  mAddress, avr.getLogicalAddress(), avr.getPhysicalAddress(), true);
-@@ -868,7 +887,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -873,7 +892,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      // Seq #32
      void changeSystemAudioMode(boolean enabled, IHdmiControlCallback callback) {
          assertRunOnServiceThread();
@@ -703,7 +703,7 @@ index 1d040bd..6953f49 100644
              setSystemAudioMode(false);
              invokeCallback(callback, HdmiControlManager.RESULT_INCORRECT_MODE);
              return;
-@@ -1626,6 +1645,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -1631,6 +1650,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
      @ServiceThreadOnly
      final void addCecDevice(HdmiDeviceInfo info) {
          assertRunOnServiceThread();
@@ -711,7 +711,7 @@ index 1d040bd..6953f49 100644
          HdmiDeviceInfo old = addDeviceInfo(info);
          if (info.getLogicalAddress() == mAddress) {
              // The addition of TV device itself should not be notified.
-@@ -1811,7 +1831,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
+@@ -1815,7 +1835,7 @@ final class HdmiCecLocalDeviceTv extends HdmiCecLocalDevice {
          // HotplugDetectionAction will be reinstated during the wake up process.
          // HdmiControlService.onWakeUp() -> initializeLocalDevices() ->
          //     LocalDeviceTv.onAddressAllocated() -> launchDeviceDiscovery().
@@ -721,10 +721,10 @@ index 1d040bd..6953f49 100644
          removeAction(PowerStatusMonitorAction.class);
          // Remove recording actions.
 diff --git a/services/core/java/com/android/server/hdmi/HdmiControlService.java b/services/core/java/com/android/server/hdmi/HdmiControlService.java
-index 9f8c340..c39103b 100755
+index 80ad4b1..5d1243f 100755
 --- a/services/core/java/com/android/server/hdmi/HdmiControlService.java
 +++ b/services/core/java/com/android/server/hdmi/HdmiControlService.java
-@@ -1407,6 +1407,7 @@ public class HdmiControlService extends SystemService {
+@@ -1365,6 +1365,7 @@ public final class HdmiControlService extends SystemService {
                      }
  
                      if (!mAddressAllocated) {
