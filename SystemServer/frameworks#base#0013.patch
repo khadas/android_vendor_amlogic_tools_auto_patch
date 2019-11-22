@@ -1,0 +1,52 @@
+From 4e9437da728c9a822c394bfca54ed50721f13726 Mon Sep 17 00:00:00 2001
+From: Jinping Wang <jinping.wang@amlogic.com>
+Date: Tue, 24 Sep 2019 16:53:01 +0800
+Subject: [PATCH] USB: Optimze process of updating USB configuration. [1/1]
+
+PD#SWPL-13784
+
+Problem:
+Something wrong with updating USB configuration.
+
+Solution:
+Optimze process of updating USB configuration.
+
+Verify:
+Verified on all TV/OTT platform of android P.
+
+Change-Id: I6b738a9a8e7ac074a185e2322b58f2c733cd42b2
+Signed-off-by: Jinping Wang <jinping.wang@amlogic.com>
+---
+ services/usb/java/com/android/server/usb/UsbDeviceManager.java | 2 +-
+ services/usb/java/com/android/server/usb/UsbService.java       | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/services/usb/java/com/android/server/usb/UsbDeviceManager.java b/services/usb/java/com/android/server/usb/UsbDeviceManager.java
+index 9f8042c..a6f5796 100644
+--- a/services/usb/java/com/android/server/usb/UsbDeviceManager.java
++++ b/services/usb/java/com/android/server/usb/UsbDeviceManager.java
+@@ -823,7 +823,7 @@ public class UsbDeviceManager implements ActivityManagerInternal.ScreenObserver
+                                     && mScreenUnlockedFunctions != UsbManager.FUNCTION_NONE) {
+                                 setScreenUnlockedFunctions();
+                             } else {
+-                                setEnabledFunctions(UsbManager.FUNCTION_NONE, false);
++                                setEnabledFunctions(mCurrentFunctions, false);
+                             }
+                         }
+                         updateUsbFunctions();
+diff --git a/services/usb/java/com/android/server/usb/UsbService.java b/services/usb/java/com/android/server/usb/UsbService.java
+index e92bd74..7b55441 100644
+--- a/services/usb/java/com/android/server/usb/UsbService.java
++++ b/services/usb/java/com/android/server/usb/UsbService.java
+@@ -397,7 +397,7 @@ public class UsbService extends IUsbManager.Stub {
+     @Override
+     public void setCurrentFunctions(long functions) {
+         mContext.enforceCallingOrSelfPermission(android.Manifest.permission.MANAGE_USB, null);
+-        Preconditions.checkArgument(UsbManager.areSettableFunctions(functions));
++        //Preconditions.checkArgument(UsbManager.areSettableFunctions(functions));
+         Preconditions.checkState(mDeviceManager != null);
+         mDeviceManager.setCurrentFunctions(functions);
+     }
+-- 
+2.10.2
+

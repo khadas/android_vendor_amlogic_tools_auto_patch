@@ -1,4 +1,4 @@
-From 7452c619f7a94f60ad979561815454f5eaff47f0 Mon Sep 17 00:00:00 2001
+From 18c7e967d046f5cd9f140e72d4f55d5b83bfa389 Mon Sep 17 00:00:00 2001
 From: Ting Li <ting.li@amlogic.com>
 Date: Mon, 17 Sep 2018 10:53:51 +0800
 Subject: [PATCH] Power: add focus for long press power action and powerkey
@@ -138,5 +138,5 @@ index 56ceda7..0aa70cf 100644
              powerMultiPressAction(eventTime, interactive, mDoublePressOnPowerBehavior);
          } else if (count == 3) {
 -- 
-1.9.1
+2.7.4
 
