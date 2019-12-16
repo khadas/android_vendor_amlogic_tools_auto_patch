@@ -43,7 +43,7 @@ index 37c7ee7..c953f0c 100644
 +                    && SystemProperties.getBoolean("audio.passthrough.enable", false);
 +            boolean hdmiControlEnabled = (Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HDMI_CONTROL_ENABLED, 1) == 1);
 +            Log.d(TAG, "adjustStreamVolume() routePassthroughVolume=" + routePassthroughVolume + ", hdmiControlEnabled=" + hdmiControlEnabled);
-+            if (routePassthroughVolume && !isMuteAdjust) {
++            if (routePassthroughVolume && !isMuteAdjust && ((device & AudioSystem.DEVICE_OUT_ALL_A2DP) == 0)) {
 +                if (hdmiControlEnabled) {
 +                    if (mHdmiManager != null) {
 +                        synchronized (mHdmiManager) {
