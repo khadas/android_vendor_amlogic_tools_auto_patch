@@ -1,0 +1,153 @@
+From 5668f69185add9add98e7159f7d4bbff2f558b37 Mon Sep 17 00:00:00 2001
+From: sky zhou <sky.zhou@amlogic.com>
+Date: Mon, 23 Dec 2019 19:57:48 +0800
+Subject: [PATCH] SurfaceFlinger: always clear fb for video overlay [1/1]
+
+PD#SWPL-18880
+
+Problem:
+Video overlay man not clear fb.
+
+Solution:
+revert change:I49790dd936a859971958253790230f403cdd8cbf
+and force clear fb for video overlay.
+
+Verify:
+verify on macroni.
+
+Change-Id: I8b54974b261ed54000940014cadb1fbc61cca382
+---
+ services/surfaceflinger/BufferLayer.cpp    | 18 +++++++++++-------
+ services/surfaceflinger/BufferLayer.h      |  2 ++
+ services/surfaceflinger/Layer.cpp          | 19 -------------------
+ services/surfaceflinger/Layer.h            |  2 ++
+ services/surfaceflinger/SurfaceFlinger.cpp |  6 +++++-
+ 5 files changed, 20 insertions(+), 27 deletions(-)
+
+diff --git a/services/surfaceflinger/BufferLayer.cpp b/services/surfaceflinger/BufferLayer.cpp
+index 1ee888e..de62a0d 100644
+--- a/services/surfaceflinger/BufferLayer.cpp
++++ b/services/surfaceflinger/BufferLayer.cpp
+@@ -934,13 +934,6 @@ bool BufferLayer::isOpaque(const Layer::State& s) const {
+         return false;
+     }
+ 
+-#ifdef REDUCE_VIDEO_WORKLOAD
+-    if (getBE().compositionInfo.mBuffer &&
+-        am_gralloc_is_omx_metadata_producer(getBE().compositionInfo.mBuffer->getUsage())) {
+-        return true;
+-    }
+-#endif
+-
+     // if the layer has the opaque flag, then we're always opaque,
+     // otherwise we use the current buffer's format.
+     return ((s.flags & layer_state_t::eLayerOpaque) != 0) || mCurrentOpacity;
+@@ -1408,6 +1401,17 @@ bool BufferLayer::consumeOmxFrame(status_t &updateResult) {
+ 
+ #endif
+ 
++bool BufferLayer::isVideoOverlay() const {
++#ifdef REDUCE_VIDEO_WORKLOAD
++	if (getBE().compositionInfo.mBuffer &&
++		am_gralloc_is_omx_metadata_producer(getBE().compositionInfo.mBuffer->getUsage())) {
++		return true;
++	}
++#endif
++	return false;
++}
++
++
+ } // namespace android
+ 
+ #if defined(__gl_h_)
+diff --git a/services/surfaceflinger/BufferLayer.h b/services/surfaceflinger/BufferLayer.h
+index 0615f22..67241a7 100644
+--- a/services/surfaceflinger/BufferLayer.h
++++ b/services/surfaceflinger/BufferLayer.h
+@@ -145,6 +145,8 @@ public:
+     void returnGpuMode();
+ #endif
+ 
++    bool isVideoOverlay() const override;
++
+ private:
+     void onFirstRef() override;
+ 
+diff --git a/services/surfaceflinger/Layer.cpp b/services/surfaceflinger/Layer.cpp
+index e9ebbdb..49c42af 100644
+--- a/services/surfaceflinger/Layer.cpp
++++ b/services/surfaceflinger/Layer.cpp
+@@ -59,11 +59,6 @@
+ #include <mutex>
+ #include "LayerProtoHelper.h"
+ 
+-#ifdef REDUCE_VIDEO_WORKLOAD
+-#include "OmxUtil.h"
+-#include <am_gralloc_ext.h>
+-#endif
+-
+ #define DEBUG_RESIZE 0
+ 
+ namespace android {
+@@ -1260,13 +1255,6 @@ bool Layer::setAlpha(float alpha) {
+     if (mCurrentState.color.a == alpha) return false;
+     mCurrentState.sequence++;
+     mCurrentState.color.a = alpha;
+-#ifdef REDUCE_VIDEO_WORKLOAD
+-    if (getBE().compositionInfo.mBuffer &&
+-        am_gralloc_is_omx_metadata_producer(getBE().compositionInfo.mBuffer->getUsage())) {
+-        mCurrentState.color.a = 1.0_hf;
+-    }
+-#endif
+-
+     mCurrentState.modified = true;
+     setTransactionFlags(eTransactionNeeded);
+     return true;
+@@ -1921,13 +1909,6 @@ Transform Layer::getTransform() const {
+ half Layer::getAlpha() const {
+     const auto& p = mDrawingParent.promote();
+ 
+-#ifdef REDUCE_VIDEO_WORKLOAD
+-        if (getBE().compositionInfo.mBuffer &&
+-            am_gralloc_is_omx_metadata_producer(getBE().compositionInfo.mBuffer->getUsage())) {
+-            return 1.0_hf;
+-        }
+-#endif
+-
+     half parentAlpha = (p != nullptr) ? p->getAlpha() : 1.0_hf;
+     return parentAlpha * getDrawingState().color.a;
+ }
+diff --git a/services/surfaceflinger/Layer.h b/services/surfaceflinger/Layer.h
+index 2239679..1844076 100644
+--- a/services/surfaceflinger/Layer.h
++++ b/services/surfaceflinger/Layer.h
+@@ -596,6 +596,8 @@ public:
+     int32_t getZ() const;
+     void pushPendingState();
+ 
++    virtual bool isVideoOverlay() const { return false; }
++
+ protected:
+     // constant
+     sp<SurfaceFlinger> mFlinger;
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index e375ce8..b36d14b 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -3118,8 +3118,12 @@ bool SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& displayDev
+                 to_string(layer->getCompositionType(hwcId)).c_str());
+         if (!clip.isEmpty()) {
+             switch (layer->getCompositionType(hwcId)) {
+-                case HWC2::Composition::Cursor:
+                 case HWC2::Composition::Device:
++			if (layer->isVideoOverlay()) {
++				layer->clearWithOpenGL(renderArea);
++				break;
++			}
++                case HWC2::Composition::Cursor:
+                 case HWC2::Composition::Sideband:
+                 case HWC2::Composition::SolidColor: {
+                     const Layer::State& state(layer->getDrawingState());
+-- 
+2.7.4
+
