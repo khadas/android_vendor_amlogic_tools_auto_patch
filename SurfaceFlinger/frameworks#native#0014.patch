@@ -1,0 +1,38 @@
+From 51318165bbdca49b2822e62f1ce291e013b7c353 Mon Sep 17 00:00:00 2001
+From: baocheng sun <baocheng.sun@amlogic.com>
+Date: Tue, 7 Jan 2020 14:55:46 +0800
+Subject: [PATCH] surfaceflinger: restart composer if surfaceflinger crash
+ [1/1]
+
+PD#TV-12438
+
+Problem:
+Screen splash during monkey test
+
+Solution:
+restart composer service if surfaceflinger crash
+
+Verify:
+Marconi
+
+Change-Id: I933f2785830830bd432e08460988ed3fb5bd29db
+Signed-off-by: baocheng sun <baocheng.sun@amlogic.com>
+---
+ services/surfaceflinger/surfaceflinger.rc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/services/surfaceflinger/surfaceflinger.rc b/services/surfaceflinger/surfaceflinger.rc
+index aea602b..f7e3eaa 100644
+--- a/services/surfaceflinger/surfaceflinger.rc
++++ b/services/surfaceflinger/surfaceflinger.rc
+@@ -3,6 +3,7 @@ service surfaceflinger /system/bin/surfaceflinger
+     user system
+     group graphics drmrpc readproc
+     onrestart restart zygote
++    onrestart restart vendor.hwcomposer-2-2
+     writepid /dev/stune/foreground/tasks
+     socket pdx/system/vr/display/client     stream 0666 system graphics u:object_r:pdx_display_client_endpoint_socket:s0
+     socket pdx/system/vr/display/manager    stream 0666 system graphics u:object_r:pdx_display_manager_endpoint_socket:s0
+-- 
+2.7.4
+
