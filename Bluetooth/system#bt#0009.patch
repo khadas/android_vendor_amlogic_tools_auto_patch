@@ -1,0 +1,57 @@
+From eecda1571439fa77920d80c9552d646693ca0568 Mon Sep 17 00:00:00 2001
+From: Kuibao Zhang <kuibao.zhang@amlogic.com>
+Date: Thu, 27 Feb 2020 00:38:46 +0800
+Subject: [PATCH] BT: fix cts Bluetooth LE Secure test fail
+
+PD#SWPL-21012
+
+Change-Id: I498570b824c0be0ff10ecea6fd9332545342780e
+---
+ stack/btm/btm_ble_bgconn.cc    | 2 ++
+ stack/btm/btm_ble_multi_adv.cc | 2 +-
+ stack/include/gatt_api.h       | 2 +-
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/stack/btm/btm_ble_bgconn.cc b/stack/btm/btm_ble_bgconn.cc
+index 952e9530a..6cbe2c8f2 100644
+--- a/stack/btm/btm_ble_bgconn.cc
++++ b/stack/btm/btm_ble_bgconn.cc
+@@ -442,7 +442,9 @@ bool btm_ble_start_auto_conn(bool start) {
+ #if (BLE_PRIVACY_SPT == TRUE)
+       if (btm_cb.ble_ctr_cb.rl_state != BTM_BLE_RL_IDLE &&
+           controller_get_interface()->supports_ble_privacy()) {
++    #if ( BLE_LOCAL_PRIVACY_ENABLED == TRUE)
+         own_addr_type |= BLE_ADDR_TYPE_ID_BIT;
++    #endif
+         peer_addr_type |= BLE_ADDR_TYPE_ID_BIT;
+       }
+ #endif
+diff --git a/stack/btm/btm_ble_multi_adv.cc b/stack/btm/btm_ble_multi_adv.cc
+index 60490fb61..48126bcbb 100644
+--- a/stack/btm/btm_ble_multi_adv.cc
++++ b/stack/btm/btm_ble_multi_adv.cc
+@@ -751,7 +751,7 @@ class BleAdvertisingManagerImpl
+       uint8_t flags_val = BTM_GENERAL_DISCOVERABLE;
+ 
+       if (p_inst->duration) flags_val = BTM_LIMITED_DISCOVERABLE;
+-
++      flags_val |= BTM_BLE_BREDR_NOT_SPT;
+       std::vector<uint8_t> flags;
+       flags.push_back(2);  // length
+       flags.push_back(HCI_EIR_FLAGS_TYPE);
+diff --git a/stack/include/gatt_api.h b/stack/include/gatt_api.h
+index f9c064291..d21c095f1 100644
+--- a/stack/include/gatt_api.h
++++ b/stack/include/gatt_api.h
+@@ -543,7 +543,7 @@ typedef struct {
+ } tGATT_DISC_RES;
+ 
+ #define GATT_LINK_IDLE_TIMEOUT_WHEN_NO_APP  \
+-  1 /* start a idle timer for this duration \
++  5 /* start a idle timer for this duration \
+      when no application need to use the link */
+ 
+ #define GATT_LINK_NO_IDLE_TIMEOUT 0xFFFF
+-- 
+2.24.0
+
