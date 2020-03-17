@@ -1,0 +1,72 @@
+From cc5a702f921c4b8decf5ce998afaa87607464353 Mon Sep 17 00:00:00 2001
+From: "hongchao.yin" <hongchao.yin@amlogic.com>
+Date: Thu, 20 Aug 2020 16:22:24 +0800
+Subject: [PATCH] oboeservice: fix race condition in timestamp path [2/3]
+
+PD#SWPL-19531
+
+Problem:
+TV-20353 [T962X3][9.0][Primrose][NTS][Audio]:PRIMROSE-2622 Test
+AUDIO-006-TC1 Step #5 Failed
+
+Solution:
+There was a potential race between setting the first timestamp
+and reading the first timestamp that could cause the timestamp service
+thread to exit. This would cause the client to not get any timestamps.
+Then the timing model would not advance and the stream would stall.
+This could result in read() or write() returning zero,
+or a TIMEOUT error.
+
+This was rare except for some devices that had different
+timing in the HAL.
+
+Verify:
+verified by franklin
+
+Change-Id: Icf30761346316724d826a33091ee77abee8c4d98
+Signed-off-by: hongchao.yin <hongchao.yin@amlogic.com>
+---
+ services/oboeservice/AAudioServiceEndpointShared.cpp | 10 +++++++++-
+ services/oboeservice/AAudioServiceEndpointShared.h   |  7 +++++++
+ 2 files changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/services/oboeservice/AAudioServiceEndpointShared.cpp b/services/oboeservice/AAudioServiceEndpointShared.cpp
+index 63b998341e..fc9f1551e5 100644
+--- a/services/oboeservice/AAudioServiceEndpointShared.cpp
++++ b/services/oboeservice/AAudioServiceEndpointShared.cpp
+@@ -192,5 +192,13 @@ aaudio_result_t AAudioServiceEndpointShared::getFreeRunningPosition(int64_t *pos
+ 
+ aaudio_result_t AAudioServiceEndpointShared::getTimestamp(int64_t *positionFrames,
+                                                           int64_t *timeNanos) {
+-    return mStreamInternal->getTimestamp(CLOCK_MONOTONIC, positionFrames, timeNanos);
++    aaudio_result_t result = mStreamInternal->getTimestamp(CLOCK_MONOTONIC, positionFrames, timeNanos);
++    if (result == AAUDIO_ERROR_INVALID_STATE) {
++        // getTimestamp() can return AAUDIO_ERROR_INVALID_STATE if the stream has
++        // not completely started. This can cause a race condition that kills the
++        // timestamp service thread.  So we reduce the error to a less serious one
++        // that allows the timestamp thread to continue.
++        result = AAUDIO_ERROR_UNAVAILABLE;
++    }
++    return result;
+ }
+diff --git a/services/oboeservice/AAudioServiceEndpointShared.h b/services/oboeservice/AAudioServiceEndpointShared.h
+index d671710447..3071a8123c 100644
+--- a/services/oboeservice/AAudioServiceEndpointShared.h
++++ b/services/oboeservice/AAudioServiceEndpointShared.h
+@@ -50,6 +50,13 @@ public:
+ 
+     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
+ 
++    /**
++     * Set time that the associated frame was presented to the hardware.
++     *
++     * @param positionFrames receive position, input value is ignored
++     * @param timeNanos receive time, input value is ignored
++     * @return AAUDIO_OK or AAUDIO_ERROR_UNAVAILABLE or other negative error
++     */
+     aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
+ 
+     virtual void            *callbackLoop() = 0;
+-- 
+2.25.0
+
