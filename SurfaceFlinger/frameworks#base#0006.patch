@@ -1,0 +1,74 @@
+From 9df32911b7553662b882a710915309db550ca5d4 Mon Sep 17 00:00:00 2001
+From: sky zhou <sky.zhou@amlogic.com>
+Date: Tue, 30 Jul 2019 16:22:08 +0800
+Subject: [PATCH] Display: update hdr caps when hotplug [2/2]
+
+PD#SWPL-8230
+
+Problem:
+HDR caps is not updated when new connector connected.
+
+Solution:
+update hdr when hotplug
+
+Verify:
+Verify by franklin.
+
+Change-Id: Ie008a79829a969cd2749fc9c6c78e6995c70cafa
+Signed-off-by: sky zhou <sky.zhou@amlogic.com>
+---
+ .../android/server/display/LocalDisplayAdapter.java    | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ mode change 100644 => 100755 services/core/java/com/android/server/display/LocalDisplayAdapter.java
+
+diff --git a/services/core/java/com/android/server/display/LocalDisplayAdapter.java b/services/core/java/com/android/server/display/LocalDisplayAdapter.java
+old mode 100644
+new mode 100755
+index b4ffa86..7b03069
+--- a/services/core/java/com/android/server/display/LocalDisplayAdapter.java
++++ b/services/core/java/com/android/server/display/LocalDisplayAdapter.java
+@@ -126,6 +126,12 @@ final class LocalDisplayAdapter extends DisplayAdapter {
+                 // Display properties changed.
+                 sendDisplayDeviceEventLocked(device, DISPLAY_DEVICE_EVENT_CHANGED);
+             }
++
++            /*always update hdr & colormodes */
++            if (device != null) {
++                device.updateColorModesLocked(colorModes, activeColorMode);
++                device.updateHdrCaps(displayToken);
++            }
+         } else {
+             // The display is no longer available. Ignore the attempt to add it.
+             // If it was connected but has already been disconnected, we'll get a
+@@ -194,9 +200,14 @@ final class LocalDisplayAdapter extends DisplayAdapter {
+             } else {
+                 mBacklight = null;
+             }
++            updateHdrCaps(displayToken);
++        }
++
++        public void updateHdrCaps(IBinder displayToken) {
+             mHdrCapabilities = SurfaceControl.getHdrCapabilities(displayToken);
+         }
+ 
++
+         @Override
+         public boolean hasStableUniqueId() {
+             return true;
+@@ -669,6 +680,13 @@ final class LocalDisplayAdapter extends DisplayAdapter {
+                 pw.print(mSupportedColorModes.get(i));
+             }
+             pw.println("]");
++
++            pw.print("mHdrCapabilities=[  ");
++            int [] hdrCaps = mHdrCapabilities.getSupportedHdrTypes();
++            for (int type : hdrCaps) {
++                pw.print(type+"  ");
++            }
++            pw.println("]");
+         }
+ 
+         private int findDisplayInfoIndexLocked(int modeId) {
+-- 
+2.7.4
+
