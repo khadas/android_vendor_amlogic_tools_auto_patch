@@ -1,0 +1,102 @@
+From bada2f0caaed72a7dc9397c857fe6b61da97c745 Mon Sep 17 00:00:00 2001
+From: Lianlian Zhu <lianlian.zhu@amlogic.com>
+Date: Sat, 21 Mar 2020 17:27:26 +0800
+Subject: [PATCH] audio: disable he-aac SBR output if FILTER_HEAAC_ENABLE [2/4]
+
+PD#SWPL-22375
+
+Problem:
+Should disable he-aac decoder as  required
+
+Solution:
+If SBR flag is detected with the MACRO "FILTER_HEAAC_ENABLE"
+disable he-aac decoder.
+
+Verify:
+Newton.
+
+Signed-off-by: Lianlian Zhu <lianlian.zhu@amlogic.com>
+Change-Id: I0560ef68db411cf77b84d27d5748b66094f03165
+---
+ Android.bp                       |  1 +
+ libAACdec/src/aacdecoder.h       |  1 +
+ libAACdec/src/aacdecoder_lib.cpp | 11 ++++++++---
+ 3 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/Android.bp b/Android.bp
+index c89a95c..7f613b2 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -29,6 +29,7 @@ cc_library_static {
+     },
+     shared_libs: [
+         "liblog",
++        "libcutils",
+     ],
+     export_include_dirs: [
+         "libAACdec/include",
+diff --git a/libAACdec/src/aacdecoder.h b/libAACdec/src/aacdecoder.h
+index 20f4c45..201eb5e 100644
+--- a/libAACdec/src/aacdecoder.h
++++ b/libAACdec/src/aacdecoder.h
+@@ -344,6 +344,7 @@ This structure is allocated once for each CPE. */
+   FDK_SignalDelay usacResidualDelay; /*!< Delay residual signal to compensate
+                                         for eSBR delay of DMX signal in case of
+                                         stereoConfigIndex==2. */
++  bool filterheaac; 
+ };
+ 
+ #define AAC_DEBUG_EXTHLP \
+diff --git a/libAACdec/src/aacdecoder_lib.cpp b/libAACdec/src/aacdecoder_lib.cpp
+index d98cf5a..841056c 100644
+--- a/libAACdec/src/aacdecoder_lib.cpp
++++ b/libAACdec/src/aacdecoder_lib.cpp
+@@ -101,7 +101,7 @@ amm-info@iis.fraunhofer.de
+ *******************************************************************************/
+ 
+ #include "aacdecoder_lib.h"
+-
++#include <cutils/properties.h>
+ #include "aac_ram.h"
+ #include "aacdecoder.h"
+ #include "tpdec_lib.h"
+@@ -130,6 +130,7 @@ amm-info@iis.fraunhofer.de
+ #define AACDECODER_LIB_BUILD_TIME __TIME__
+ #endif
+ 
++#define PROPERTY_FILTER_HEAAC "media.filter.heaac"
+ static AAC_DECODER_ERROR setConcealMethod(const HANDLE_AACDECODER self,
+                                           const INT method);
+ 
+@@ -917,7 +918,6 @@ LINKSPEC_CPP HANDLE_AACDECODER aacDecoder_Open(TRANSPORT_TYPE transportFmt,
+   HANDLE_TRANSPORTDEC pIn;
+   int err = 0;
+   int stereoConfigIndex = -1;
+-
+   UINT nrOfLayers_min = fMin(nrOfLayers, (UINT)1);
+ 
+   /* Allocate transport layer struct. */
+@@ -1015,6 +1015,7 @@ bail:
+     aacDecoder_Close(aacDec);
+     aacDec = NULL;
+   }
++  aacDec->filterheaac = property_get_bool(PROPERTY_FILTER_HEAAC, false);
+   return aacDec;
+ }
+ 
+@@ -1916,7 +1917,11 @@ bail:
+       self->streamInfo.numChannels * self->streamInfo.frameSize) {
+     ErrorStatus = AAC_DEC_OUTPUT_BUFFER_TOO_SMALL;
+   }
+-
++  if (self->sbrEnabled && self->filterheaac) {
++      FDKmemclear(pTimeData_extern,
++                timeDataSize_extern * sizeof(*pTimeData_extern));
++      return ErrorStatus;
++  } 
+   /* Update external output buffer. */
+   if (IS_OUTPUT_VALID(ErrorStatus)) {
+     FDKmemcpy(pTimeData_extern, pTimeData,
+-- 
+2.7.4
+
