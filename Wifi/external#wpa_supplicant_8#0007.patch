@@ -1,0 +1,71 @@
+From 3ece58386818ae8b2d76bed3c57680d63dc423fd Mon Sep 17 00:00:00 2001
+From: "rongjun.chen" <rongjun.chen@amlogic.com>
+Date: Thu, 30 Apr 2020 10:23:53 +0800
+Subject: [PATCH 7/7] wifi: not bcm wifi the p2p is support p2p_no_group_iface
+ [1/1]
+
+PD#SWPL-25248
+
+Problem:
+not bcm wifi p2p0 interface!
+
+Solution:
+add p2p_no_group_iface support
+
+Verify:
+newton
+
+Change-Id: Icb0f1d4170c087820ad6f2c134d6dd74e924fb41
+Signed-off-by: rongjun.chen <rongjun.chen@amlogic.com>
+---
+ src/utils/common.h              | 4 +++-
+ wpa_supplicant/main.c           | 2 +-
+ wpa_supplicant/p2p_supplicant.c | 4 ++++
+ 3 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/src/utils/common.h b/src/utils/common.h
+index 46e96a65..41b5c5de 100644
+--- a/src/utils/common.h
++++ b/src/utils/common.h
+@@ -81,7 +81,9 @@ typedef int socklen_t;
+ #undef close
+ #define close closesocket
+ #endif /* _MSC_VER */
+-
++#ifdef MULTI_WIFI_SUPPORT
++int is_wifi_driver_loaded(const char *module_tag);
++#endif
+ 
+ /* Define platform specific integer types */
+ 
+diff --git a/wpa_supplicant/main.c b/wpa_supplicant/main.c
+index cbc6339c..fcded828 100644
+--- a/wpa_supplicant/main.c
++++ b/wpa_supplicant/main.c
+@@ -20,7 +20,7 @@
+ #include <dlfcn.h>
+ static const char SUPP_CONFIG_TEMPLATE[]= "/vendor/etc/wifi/wpa_supplicant.conf";
+ static const char P2P_CONFIG_FILE[]     = "/data/vendor/wifi/wpa/p2p_supplicant.conf";
+-static int is_wifi_driver_loaded(const char *module_tag)
++int is_wifi_driver_loaded(const char *module_tag)
+ {
+     FILE *proc;
+     char line[sizeof(module_tag)+10];
+diff --git a/wpa_supplicant/p2p_supplicant.c b/wpa_supplicant/p2p_supplicant.c
+index 0eccd52f..f3987f22 100644
+--- a/wpa_supplicant/p2p_supplicant.c
++++ b/wpa_supplicant/p2p_supplicant.c
+@@ -4579,6 +4579,10 @@ static void wpas_p2p_deinit_global(struct wpa_global *global)
+ 
+ static int wpas_p2p_create_iface(struct wpa_supplicant *wpa_s)
+ {
++#ifdef MULTI_WIFI_SUPPORT
++	if (!is_wifi_driver_loaded("dhd") && !is_wifi_driver_loaded("bcmdhd"))
++		wpa_s->conf->p2p_no_group_iface=1;
++#endif
+ 	if (wpa_s->conf->p2p_no_group_iface)
+ 		return 0; /* separate interface disabled per configuration */
+ 	if (wpa_s->drv_flags &
+-- 
+2.25.1
+
