@@ -1,0 +1,42 @@
+From 5d5f10fe30e4c29cb90fd6778c9a5ec8530686be Mon Sep 17 00:00:00 2001
+From: Zhiwei Yan <zhiwei.yan@amlogic.com>
+Date: Mon, 11 May 2020 17:01:13 +0800
+Subject: [PATCH] ViewRootImpl: remove reset mPreviousTransparentRegion [1/1]
+
+PD#SWPL-22491
+
+Problem:
+transparent region error
+
+Solution:
+remove reset mPreviousTransparentRegion
+
+Verify:
+ok on newton.
+
+Change-Id: I408bf9296f43042c5fbb899337c515ff2fae62d8
+Signed-off-by: Zhiwei Yan <zhiwei.yan@amlogic.com>
+---
+ core/java/android/view/ViewRootImpl.java | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+ mode change 100755 => 100644 core/java/android/view/ViewRootImpl.java
+
+diff --git a/core/java/android/view/ViewRootImpl.java b/core/java/android/view/ViewRootImpl.java
+old mode 100755
+new mode 100644
+index d378f2039c1..ca7d033fce7
+--- a/core/java/android/view/ViewRootImpl.java
++++ b/core/java/android/view/ViewRootImpl.java
+@@ -2098,7 +2098,8 @@ public final class ViewRootImpl implements ViewParent,
+                         // all at once.
+                         newSurface = true;
+                         mFullRedrawNeeded = true;
+-                        mPreviousTransparentRegion.setEmpty();
++                        //remove it as transparent region error after resume
++                        //mPreviousTransparentRegion.setEmpty();
+ 
+                         // Only initialize up-front if transparent regions are not
+                         // requested, otherwise defer to see if the entire window
+-- 
+2.26.1
+
