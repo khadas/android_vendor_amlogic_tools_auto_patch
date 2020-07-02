@@ -1,0 +1,38 @@
+From d8825cbecc33d852a54e7571482cd44544170992 Mon Sep 17 00:00:00 2001
+From: yuehu mi <yuehu.mi@amlogic.com>
+Date: Thu, 2 Jul 2020 17:44:59 +0800
+Subject: [PATCH] drm: remove unused android.hardware.drm* [4/4]
+
+PD#OTT-11410
+
+Problem:
+Optimize system startup load
+
+Solution:
+del android.hardware.drm@1.0-service.rc
+
+Verify:
+s905y2
+
+Change-Id: Ia90c0f8cadc642b3ac264896903e591537c25a24
+Signed-off-by: yuehu mi <yuehu.mi@amlogic.com>
+---
+ drm/1.0/default/Android.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drm/1.0/default/Android.mk b/drm/1.0/default/Android.mk
+index 99773be38..e8a4676d1 100644
+--- a/drm/1.0/default/Android.mk
++++ b/drm/1.0/default/Android.mk
+@@ -20,7 +20,7 @@ LOCAL_PATH := $(call my-dir)
+ 
+ include $(CLEAR_VARS)
+ LOCAL_MODULE := android.hardware.drm@1.0-service
+-LOCAL_INIT_RC := android.hardware.drm@1.0-service.rc
++#LOCAL_INIT_RC := android.hardware.drm@1.0-service.rc
+ LOCAL_PROPRIETARY_MODULE := true
+ LOCAL_MODULE_RELATIVE_PATH := hw
+ LOCAL_SRC_FILES := \
+-- 
+2.25.0
+
