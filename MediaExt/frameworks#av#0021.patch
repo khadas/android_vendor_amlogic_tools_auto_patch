@@ -1,0 +1,38 @@
+From 1c8e8f8ed36dfb84ee90fd3f7f1c39fdc4036edd Mon Sep 17 00:00:00 2001
+From: yuehu mi <yuehu.mi@amlogic.com>
+Date: Thu, 2 Jul 2020 17:32:18 +0800
+Subject: [PATCH] drm: remove unused android.hardware.drm* [2/4]
+
+PD#OTT-11410
+
+Problem:
+Optimize system startup load
+
+Solution:
+del android.hardware.drm@1.1-service.clearkey.rc
+
+Verify:
+s905y2
+
+Change-Id: I75745d37b9de6c4d521da6817c6ae81644905c5b
+Signed-off-by: yuehu mi <yuehu.mi@amlogic.com>
+---
+ drm/mediadrm/plugins/clearkey/hidl/Android.bp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drm/mediadrm/plugins/clearkey/hidl/Android.bp b/drm/mediadrm/plugins/clearkey/hidl/Android.bp
+index 341d4f645d..9474851181 100644
+--- a/drm/mediadrm/plugins/clearkey/hidl/Android.bp
++++ b/drm/mediadrm/plugins/clearkey/hidl/Android.bp
+@@ -37,7 +37,7 @@ cc_binary {
+     relative_install_path: "hw",
+ 
+     cflags: ["-Wall", "-Werror"],
+-    init_rc: ["android.hardware.drm@1.1-service.clearkey.rc"],
++    //init_rc: ["android.hardware.drm@1.1-service.clearkey.rc"],
+ 
+     shared_libs: [
+         "android.hardware.drm@1.0",
+-- 
+2.25.0
+
