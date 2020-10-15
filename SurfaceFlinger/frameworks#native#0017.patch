@@ -1,0 +1,47 @@
+From b66fcd692eb04668e7fafa0a35f7cf5baf1defe2 Mon Sep 17 00:00:00 2001
+From: haiyuan xiong <haiyuan.xiong@amlogic.com>
+Date: Thu, 15 Oct 2020 14:35:00 +0800
+Subject: [PATCH] SurfaceFlinger: let hwc decide composition type when no hdr
+ support [1/1]
+
+PD#OTT-13761
+
+Problem:
+Unable to play the HDR content if HDR cap set to disabled
+
+Solution:
+Let hwc decide composition type when HDR cap is diasbled
+
+Verify:
+verify on u212
+
+Change-Id: Ic9113232e82dcafd73b373b9e95d8918b2969ced
+Signed-off-by: haiyuan xiong <haiyuan.xiong@amlogic.com>
+---
+ services/surfaceflinger/SurfaceFlinger.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 9d4184c26..f42cc95dc 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -2122,6 +2122,8 @@ void SurfaceFlinger::setUpHWComposer() {
+                     "display %zd: %d", displayId, result);
+         }
+         for (auto& layer : displayDevice->getVisibleLayersSortedByZ()) {
++        /*amlogic soc can handle hdr->sdr, do not use gpu.*/
++        /*
+             if (layer->isHdrY410()) {
+                 layer->forceClientComposition(hwcId);
+             } else if ((layer->getDataSpace() == Dataspace::BT2020_PQ ||
+@@ -2133,6 +2135,7 @@ void SurfaceFlinger::setUpHWComposer() {
+                     !displayDevice->hasHLGSupport()) {
+                 layer->forceClientComposition(hwcId);
+             }
++        */
+ 
+             if (layer->getForceClientComposition(hwcId)) {
+                 ALOGV("[%s] Requesting Client composition", layer->getName().string());
+-- 
+2.26.1
+
