@@ -1,0 +1,89 @@
+From 8b5da529b2c950c498008e0635a1d635f8ec09a3 Mon Sep 17 00:00:00 2001
+From: "shipeng.sun" <shipeng.sun@amlogic.com>
+Date: Tue, 20 Oct 2020 10:04:22 +0800
+Subject: [PATCH] libstatgefright: nts OPL-001-TC4 test failed [1/1]
+
+Bug:171534171
+PD#SWPL-35082
+
+Problem:
+For tunnel mode we can't set resolution to drm, so
+add it when call queueSecureInputBuffer.
+
+Solutoin:
+For tunnel mode we can't set resolution to drm, so
+add it when call queueSecureInputBuffer.
+
+Verify:
+AndroidQ
+
+Change-Id: Icddb478051402d0b5ac0db29b78222faa96d8aa7
+Signed-off-by: shipeng.sun <shipeng.sun@amlogic.com>
+
+diff --git a/media/libstagefright/MediaCodec.cpp b/media/libstagefright/MediaCodec.cpp
+index 353e40702f..122f602dfc 100644
+--- a/media/libstagefright/MediaCodec.cpp
++++ b/media/libstagefright/MediaCodec.cpp
+@@ -528,6 +528,9 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
+       mDequeueInputReplyID(0),
+       mDequeueOutputTimeoutGeneration(0),
+       mDequeueOutputReplyID(0),
++      mTunneledInputWidth(0),
++      mTunneledInputHeight(0),
++      mTunneled(false),
+       mHaveInputSurface(false),
+       mHavePendingInputBuffers(false),
+       mCpuBoostRequested(false),
+@@ -2448,6 +2451,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
+ 
+             extractCSD(format);
+ 
++            int32_t tunneled;
++            if (format->findInt32("feature-tunneled-playback", &tunneled) && tunneled != 0) {
++                ALOGI("Configuring TUNNELED video playback.");
++                mTunneled = true;
++            } else {
++                mTunneled = false;
++            }
++
+             mCodec->initiateConfigureComponent(format);
+             break;
+         }
+@@ -3223,7 +3234,18 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
+     if (hasCryptoOrDescrambler()) {
+         AString *errorDetailMsg;
+         CHECK(msg->findPointer("errorDetailMsg", (void **)&errorDetailMsg));
+-
++        // Notify mCrypto of video resolution changes
++        if (mTunneled && mCrypto != NULL) {
++            int32_t width, height;
++            if (mInputFormat->findInt32("width", &width) &&
++                mInputFormat->findInt32("height", &height) && width > 0 && height > 0) {
++                if (width != mTunneledInputWidth || height != mTunneledInputHeight) {
++                    mTunneledInputWidth = width;
++                    mTunneledInputHeight = height;
++                    mCrypto->notifyResolution(width, height);
++                }
++            }
++        }
+         err = mBufferChannel->queueSecureInputBuffer(
+                 buffer,
+                 (mFlags & kFlagIsSecure),
+diff --git a/media/libstagefright/include/media/stagefright/MediaCodec.h b/media/libstagefright/include/media/stagefright/MediaCodec.h
+index 7f6aae6281..4695cda632 100644
+--- a/media/libstagefright/include/media/stagefright/MediaCodec.h
++++ b/media/libstagefright/include/media/stagefright/MediaCodec.h
+@@ -363,6 +363,10 @@ private:
+ 
+     sp<ICrypto> mCrypto;
+ 
++    int32_t mTunneledInputWidth;
++    int32_t mTunneledInputHeight;
++    bool mTunneled;
++
+     sp<IDescrambler> mDescrambler;
+ 
+     List<sp<ABuffer> > mCSD;
+-- 
+2.25.2
+
