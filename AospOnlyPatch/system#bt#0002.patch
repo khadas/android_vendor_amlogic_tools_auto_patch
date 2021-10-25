@@ -1,0 +1,40 @@
+From 326c4e4ddf3f528011c08eaca56a5f93e235aad0 Mon Sep 17 00:00:00 2001
+From: "junlan.duan" <junlan.duan@amlogic.com>
+Date: Fri, 22 Oct 2021 19:12:12 +0800
+Subject: [PATCH] bluetooth: fix 64bit compile error
+
+PD#SH-8250
+
+Problem:
+while build 64bit reversion, there are some warns handled by compiler as error
+
+Solution:
+modify buid script
+
+Verify:
+p1
+
+Change-Id: I9ee132912adda3df83a0bc12607ebb7431914e13
+---
+ audio_a2dp_hw/Android.bp | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/audio_a2dp_hw/Android.bp b/audio_a2dp_hw/Android.bp
+index 7a23e27ee..14be1c987 100644
+--- a/audio_a2dp_hw/Android.bp
++++ b/audio_a2dp_hw/Android.bp
+@@ -18,6 +18,11 @@ cc_library {
+         "src/audio_a2dp_hw.cc",
+         "src/audio_a2dp_hw_utils.cc",
+     ],
++
++    cflags: [
++        "-Wno-format",
++    ],
++
+     shared_libs: [
+         "liblog",
+         "libcutils",
+-- 
+2.25.1
+

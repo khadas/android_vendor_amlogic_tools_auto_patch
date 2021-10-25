@@ -1,0 +1,32 @@
+From 3909966b5d44c18d59d8d8b0c701a762485ac889 Mon Sep 17 00:00:00 2001
+From: junlan.duan <junlan.duan@amlogic.com>
+Date: Fri, 22 Oct 2021 17:00:40 +0800
+Subject: [PATCH] frameworks: add android 64bit support
+
+PD#SH-8250
+
+Problem:
+add android p 64bit support
+
+Solution:
+build 64bit library
+
+Verify:
+p1
+
+Change-Id: Iab577db1fc3758f1ac338f6464dd0b3a89b125da
+---
+
+diff --git a/media/libmediaplayerservice/Android.bp b/media/libmediaplayerservice/Android.bp
+index a37973b..86371b6 100644
+--- a/media/libmediaplayerservice/Android.bp
++++ b/media/libmediaplayerservice/Android.bp
+@@ -63,7 +63,7 @@
+ 
+     name: "libmediaplayerservice",
+ 
+-    compile_multilib: "32",
++    compile_multilib: "both",
+ 
+     sanitize: {
+         cfi: true,

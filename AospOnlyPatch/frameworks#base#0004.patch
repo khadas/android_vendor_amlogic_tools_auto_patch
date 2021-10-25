@@ -1,0 +1,36 @@
+From cb85ac7cea645e1d567aa9f4bde11c2a2c8a3f0c Mon Sep 17 00:00:00 2001
+From: "junlan.duan" <junlan.duan@amlogic.com>
+Date: Fri, 22 Oct 2021 17:47:27 +0800
+Subject: [PATCH] bootanimation: fix android p 64bit compile error
+
+PD#SH-8250
+
+Problem:
+add android p 64bit support
+while build 64bit reversion, there are some warns handled by compiler as error
+
+Solution:
+modify buid script
+
+Verify:
+p1
+
+Change-Id: Ibaef56a16da35004c87d428845ae6cd6f8a5d8e4
+---
+ cmds/bootanimation/Android.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cmds/bootanimation/Android.mk b/cmds/bootanimation/Android.mk
+index 41653709e76d..2794297adbae 100644
+--- a/cmds/bootanimation/Android.mk
++++ b/cmds/bootanimation/Android.mk
+@@ -1,5 +1,5 @@
+ bootanimation_CommonCFlags = -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
+-bootanimation_CommonCFlags += -Wall -Werror -Wunused -Wunreachable-code
++bootanimation_CommonCFlags += -Wall -Werror -Wunused -Wunreachable-code -Wno-format
+ 
+ 
+ # bootanimation executable
+-- 
+2.25.1
+

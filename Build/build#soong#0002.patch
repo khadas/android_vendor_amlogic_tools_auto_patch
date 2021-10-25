@@ -1,0 +1,61 @@
+From 0d8d5061d56ccd8aa483c88dac1bb06cd8fcf091 Mon Sep 17 00:00:00 2001
+From: junlan.duan <junlan.duan@amlogic.com>
+Date: Fri, 22 Oct 2021 16:22:38 +0800
+Subject: [PATCH] bulid: fix Android P 64bit compile issue
+
+PD#SH-8250
+
+Problem:
+add android p 64bit support
+while build 64bit reversion, there are some warns handled by compiler as error
+add ARM64_BIT flag for prevent impact 32bit build
+Solution:
+modify buid script
+
+Verify:
+p1
+
+Change-Id: I4d760d45c10a2d0847f9f56547070b07f19b4e65
+---
+
+diff --git a/cc/compiler.go b/cc/compiler.go
+index 1b0eb4e..cf65c5c 100644
+--- a/cc/compiler.go
++++ b/cc/compiler.go
+@@ -502,7 +502,7 @@
+ 				addToModuleList(ctx, modulesAddedWall, module)
+ 				flags.CFlags = append([]string{"-Wall"}, flags.CFlags...)
+ 			} else {
+-				flags.CFlags = append([]string{"-Wall", "-Werror"}, flags.CFlags...)
++				flags.CFlags = append([]string{"-Wall"}, flags.CFlags...)
+ 			}
+ 		}
+ 	}
+diff --git a/cc/config/arm64_device.go b/cc/config/arm64_device.go
+index b2b0764..9c8c1db 100644
+--- a/cc/config/arm64_device.go
++++ b/cc/config/arm64_device.go
+@@ -43,7 +43,9 @@
+ 		"-Wl,--icf=safe",
+ 	}
+ 
+-	arm64Cppflags = []string{}
++	arm64Cppflags = []string{
++	    "-DARM64_BIT",
++	}
+ 
+ 	arm64CpuVariantCflags = map[string][]string{
+ 		"cortex-a53": []string{
+diff --git a/cc/ndk_library.go b/cc/ndk_library.go
+index 5a76666..80fb458 100644
+--- a/cc/ndk_library.go
++++ b/cc/ndk_library.go
+@@ -252,7 +252,7 @@
+ 		"-Wno-builtin-requires-header",
+ 		"-Wno-invalid-noreturn",
+ 		"-Wall",
+-		"-Werror",
++
+ 		// These libraries aren't actually used. Don't worry about unwinding
+ 		// (avoids the need to link an unwinder into a fake library).
+ 		"-fno-unwind-tables",
